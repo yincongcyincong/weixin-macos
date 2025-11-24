@@ -123,7 +123,7 @@ __write_nocancel() [libsystem_kernel.dylib] 被调用
 明显看到代码被混淆，下一步使用 Interceptor.attach() 对内存进行hook 
 ```
 cd go/src/github.com/yincongcyincong/nixiang
-frida  -p 19738 -l ./script.js 
+frida  -p 79464 -l ./script.js 
 ```
 
 能打印 send
@@ -182,7 +182,38 @@ Interceptor.attach(wechat.findExportByName("write"), {
 
 ```
 
-找到明文
+拦截发送库  
 ```
+const libc = Process.getModuleByName("libSystem.B.dylib");
+
+Interceptor.attach(libc.findExportByName("read"), {
+    onEnter(args) {
+        this.buf = args[1];
+        this.len = args[2].toInt32();
+    },
+    onLeave(retval) {
+        if (retval.toInt32() > 0) {
+            console.log("=== Read Data ===");
+            console.log(hexdump(this.buf, { length: retval.toInt32() }));
+            console.log(Thread.backtrace(this.context, Backtracer.FUZZY)
+                .map(DebugSymbol.fromAddress).join("\n"));
+        }
+    }
+});
+
+Interceptor.attach(libc.findExportByName("write"), {
+    onEnter(args) {
+        this.buf = args[1];
+        this.len = args[2].toInt32();
+    },
+    onLeave(retval) {
+        if (retval.toInt32() > 0) {
+            console.log("=== Write Data ===");
+            console.log(hexdump(this.buf, { length: retval.toInt32() }));
+            console.log(Thread.backtrace(this.context, Backtracer.FUZZY)
+                .map(DebugSymbol.fromAddress).join("\n"));
+        }
+    }
+});
 
 ```
