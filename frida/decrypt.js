@@ -11,9 +11,8 @@ Interceptor.attach(realAddr, {
                     continue;
                 }
 
-                console.log(`\n[+] arg${i} ${args[i]}`, args[i].compare(ptr("0x600000000000")) >= 0, args[i].compare(ptr("0x700000000000")) < 0);
-                if (args[i].compare(ptr("0x600000000000")) >= 0 && args[i].compare(ptr("0x700000000000")) < 0) {
-                    console.log(`\n[+] enter arg${i} ${args[i]}`);
+                console.log(`\n[+] arg${i} ${args[i]}`);
+                if (args[i].compare(ptr("0x600000000000")) >= 0 && args[i].compare(ptr("0x700000000000")) < 0 && args[i].and(0x7).isNull()) {
                     const buf = args[i].readByteArray(128)
                     if (!buf) {
                         continue;
@@ -28,7 +27,7 @@ Interceptor.attach(realAddr, {
                         }
                     }
 
-                    console.log("show s is", s);
+                    console.log(s);
                 }
             } catch (e) {
                 console.log("Enter Error:", e);
