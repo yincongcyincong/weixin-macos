@@ -86,7 +86,6 @@ function sendMessageWechat() {
 Interceptor.attach(targetAddress, {
     onEnter: function (args) {
         console.log(`[ENTER] sendMsg called with a1 = ${args[0]}`);
-
         // 检查传入的结构
         const a1 = args[0]
         console.log(`  a1:  ${a1.readPointer()}`);
@@ -94,13 +93,6 @@ Interceptor.attach(targetAddress, {
         console.log(` a1+16: ${a1.add(0x10).readPointer()}`);
         console.log(`  a1+24: ${a1.add(0x18).readPointer()}`);
         console.log(`  a1+32: ${a1.add(0x20).readPointer()}`);
-        if (resent) {
-            resent = false;
-            arg0 = a1;
-            // resend()
-            Thread.sleep(100);
-        }
-        console.log(`[ENTER] sendMsg called with a1 = ${args[0]}`);
 
     },
     onLeave: function (retval) {

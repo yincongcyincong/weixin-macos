@@ -3,3 +3,4 @@ __handlers__
 *.sqlite
 .DS_Store
 diaphora_batch*
+data
