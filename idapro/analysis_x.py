@@ -116,9 +116,7 @@ def print_register_struct(reg_name, struct_size=64, max_depth=3):
     :param max_depth: 最大递归深度
     """
     print(f"\n{'='*60}")
-    print(f"分析寄存器: {reg_name}")
-    print(f"结构体大小: {struct_size} 字节")
-    print(f"{'='*60}")
+    print(f"分析寄存器: {reg_name} 结构体大小: {struct_size} 字节")
 
     traceMap = {}
     try:
@@ -195,4 +193,4 @@ analyze_all_args()
 example_usage()
 """
 
-print_register_struct("X1", 128, 3)
+print_register_struct("X0", 128, 4)

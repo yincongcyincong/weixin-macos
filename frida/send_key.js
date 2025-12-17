@@ -383,6 +383,13 @@ function sendQtKeyEvent(keyCode, text, modifiers = 0) {
     }
 }
 
+// 8. 导出函数到全局
+global.sendEnterKey = sendEnterKey;
+global.sendText123 = sendText123;
+global.send123AndEnter = send123AndEnter;
+global.injectKey = injectKey;
+global.sendQtKeyEvent = sendQtKeyEvent;
+
 // 9. 创建交互式菜单
 function showMenu() {
     console.log("\n" + "=".repeat(50));
