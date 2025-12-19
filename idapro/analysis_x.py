@@ -193,4 +193,4 @@ analyze_all_args()
 example_usage()
 """
 
-print_register_struct("X0", 128, 4)
+print_register_struct("X2", 128, 4)
