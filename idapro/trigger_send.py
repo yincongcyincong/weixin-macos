@@ -2,12 +2,11 @@ import ida_idd
 import ida_bytes
 
 # 改task id， 改 cgi，改第一个指针即可
-
 payload = (
-    b"\xFF\x00\x00\x00\x0A\x02\x00\x00"  # 0x00 // task id / cmd id 175ED6600
+    b"\x00\x00\x00\x02\x0A\x02\x00\x00"  # 0x00 // task id / cmd id 175ED6600
     b"\x00\x00\x00\x00\x00\x00\x00\x00"  # 0x08
     b"\x03\x00\x00\x00\x10\x00\x00\x00"  # 0x10
-    b"\x70\xa9\x07\xb8\x0c\x00\x00\x00"  # 0x18 // cgi
+    b"\xf0\x02\x38\x38\x0d\x00\x00\x00"  # 0x18 // cgi
     b"\x20\x00\x00\x00\x00\x00\x00\x00"  # 0x20
     b"\x30\x00\x00\x00\x00\x00\x00\x80"  # 0x28
     b"\x00\x01\x01\x01\x00\xAA\xAA\xAA"  # 0x30
@@ -59,8 +58,10 @@ payload = (
 )
 ida_bytes.patch_bytes(0x175ED6600, payload)
 
+my_func = ida_idd.Appcall.proto(0x10444A99C, "long long __fastcall sub_10444A99C(long long *a1, long long a2);")
+
 try:
-    Appcall.sub_10444B75C(0x8776FE800, 0x175ED6600)
+    my_func(0x7D72BD400, 0x175ED6600)
     print("Executed with manually set X0.")
 except Exception as e:
     print(f"Error: {e}")
