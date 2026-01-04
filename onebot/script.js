@@ -6,21 +6,38 @@ if (!baseAddr) {
 console.log("[+] WeChat base address: " + baseAddr);
 
 // 触发函数地址,不同版本的地址看wechat_version 中的json文件复制过来
-var triggerFuncAddr = baseAddr.add(0x444A99C);
-var sendMessageCallbackFunc = baseAddr.add(0xEDB4678);
-var messageCallbackFunc1 = baseAddr.add(0x7f04f70);
-var messageCallbackFunc2 = baseAddr.add(0x7f04fc8);
-var messageCallbackFunc3 = baseAddr.add(0x7f96918);
-var messageCallbackFunc4 = baseAddr.add(0x7f96a08);
-var messageCallbackFunc5 = baseAddr.add(0x7f968a0);
-var messageCallbackFunc6 = baseAddr.add(0x7f9dfe0);
+var triggerFuncAddr = baseAddr.add({{.triggerFuncAddr}});
+var sendMessageCallbackFunc = baseAddr.add({{.sendMessageCallbackFunc}});
+var messageCallbackFunc1 = baseAddr.add({{.messageCallbackFunc1}});
+var messageCallbackFunc2 = baseAddr.add({{.messageCallbackFunc2}});
+var messageCallbackFunc3 = baseAddr.add({{.messageCallbackFunc3}});
+var messageCallbackFunc4 = baseAddr.add({{.messageCallbackFunc4}});
+var messageCallbackFunc5 = baseAddr.add({{.messageCallbackFunc5}});
+var messageCallbackFunc6 = baseAddr.add({{.messageCallbackFunc6}});
 
 // 这个必须是绝对位置
-var triggerX1Payload = ptr(0x175ED6600);
-var req2bufEnterAddr = baseAddr.add(0x33EE8E8);
-var req2bufExitAddr = baseAddr.add(0x33EFA00);
-var protobufAddr = baseAddr.add(0x223EF58);
-var receiveAddr = baseAddr.add(0x23B5348);
+var triggerX1Payload = ptr({{.triggerX1Payload}});
+var req2bufEnterAddr = baseAddr.add({{.req2bufEnterAddr}});
+var req2bufExitAddr = baseAddr.add({{.req2bufExitAddr}});
+var protobufAddr = baseAddr.add({{.protobufAddr}});
+var receiveAddr = baseAddr.add({{.receiveAddr}});
+
+// // 触发函数地址,不同版本的地址看wechat_version 中的json文件复制过来
+// var triggerFuncAddr = baseAddr.add(0x444A99C);
+// var sendMessageCallbackFunc = baseAddr.add(0xEDB4678);
+// var messageCallbackFunc1 = baseAddr.add(0x7f04f70);
+// var messageCallbackFunc2 = baseAddr.add(0x7f04fc8);
+// var messageCallbackFunc3 = baseAddr.add(0x7f96918);
+// var messageCallbackFunc4 = baseAddr.add(0x7f96a08);
+// var messageCallbackFunc5 = baseAddr.add(0x7f968a0);
+// var messageCallbackFunc6 = baseAddr.add(0x7f9dfe0);
+//
+// // 这个必须是绝对位置
+// var triggerX1Payload = ptr(0x175ED6600);
+// var req2bufEnterAddr = baseAddr.add(0x33EE8E8);
+// var req2bufExitAddr = baseAddr.add(0x33EFA00);
+// var protobufAddr = baseAddr.add(0x223EF58);
+// var receiveAddr = baseAddr.add(0x23B5348);
 
 // 触发函数X0参数地址
 var globalMessagePtr = ptr(0);

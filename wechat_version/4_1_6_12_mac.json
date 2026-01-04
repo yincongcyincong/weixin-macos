@@ -6,8 +6,10 @@
   "messageCallbackFunc3": "0x7f96918",
   "messageCallbackFunc4": "0x7f96a08",
   "messageCallbackFunc5": "0x7f968a0",
+  "messageCallbackFunc6": "0x7f9dfe0",
   "triggerX1Payload": "0x175ED6600",
   "req2bufEnterAddr": "0x33EE8E8",
   "req2bufExitAddr": "0x33EFA00",
-  "protobufAddr": "0x223EF58"
+  "protobufAddr": "0x223EF58",
+  "receiveAddr": "0x23B5348"
 }

@@ -16,6 +16,7 @@ import (
 	"os/signal"
 	"sync/atomic"
 	"syscall"
+	"text/template"
 	"time"
 	
 	"github.com/frida/frida-go/frida"
@@ -63,6 +64,8 @@ type Config struct {
 	FridaGadgetAddr string `json:"frida_gadget_addr"`
 	WechatPid       int    `json:"wechat_pid"`
 	OnebotToken     string `json:"onebot_token"`
+	
+	WechatConf string `json:"wechat_conf"`
 }
 
 func initFlag() {
@@ -72,6 +75,7 @@ func initFlag() {
 	flag.StringVar(&config.FridaGadgetAddr, "gadget_addr", "127.0.0.1:27042", "Gadget 地址: 127.0.0.1:27042 仅当 type 为 gadget 时有效")
 	flag.IntVar(&config.WechatPid, "wechat_pid", 0, "微信进程 ID: 58183, 仅当 type 为 local 时有效")
 	flag.StringVar(&config.OnebotToken, "token", "MuseBot", "OneBot Token: 123456")
+	flag.StringVar(&config.WechatConf, "wechat_conf", "../wechat_version/4_1_6_12_mac.json", "微信配置文件路径: ../wechat_version/4_1_6_12_mac.json")
 	
 	flag.Parse()
 	
@@ -81,6 +85,7 @@ func initFlag() {
 	fmt.Println("FridaGadgetAddr", config.FridaGadgetAddr)
 	fmt.Println("WechatPid", config.WechatPid)
 	fmt.Println("OnebotToken", config.OnebotToken)
+	fmt.Println("WechatConf", config.WechatConf)
 	
 }
 
@@ -121,8 +126,35 @@ func initFrida() {
 }
 
 func loadJs() {
-	js, _ := os.ReadFile("./script.js")
-	script, err := session.CreateScript(string(js))
+	jsonData, err := os.ReadFile(config.WechatConf)
+	if err != nil {
+		log.Fatalf("读取文件失败: %v\n", err)
+	}
+	
+	// 2. 将 JSON 解析为 Map
+	var wechatHookConf map[string]interface{}
+	if err := json.Unmarshal(jsonData, &wechatHookConf); err != nil {
+		log.Fatalf("解析 JSON 失败: %v\n", err)
+	}
+	
+	codeTemplate, err := os.ReadFile("./script.js")
+	if err != nil {
+		log.Fatalf("读取脚本失败: %v\n", err)
+	}
+	
+	tmpl, err := template.New("fridaScript").Parse(string(codeTemplate))
+	if err != nil {
+		fmt.Printf("解析模板失败: %v\n", err)
+		return
+	}
+	
+	var buf bytes.Buffer
+	err = tmpl.Execute(&buf, wechatHookConf)
+	if err != nil {
+		log.Fatalf("执行模板失败: %v\n", err)
+	}
+	
+	script, err := session.CreateScript(buf.String())
 	if err != nil {
 		log.Fatalf("❌ 创建脚本失败: %v\n", err)
 	}
