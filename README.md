@@ -8,7 +8,8 @@ frida -f /Applications/WeChat.app/Contents/MacOS/WeChat -l frida/succ.js
 manualTrigger(0x20000095, "wxid_xxxx", "hi")
 ```
 
-没有关闭SIP，查看文件https://github.com/yincongcyincong/weixin-macos/blob/main/frida-gadget/readme.md，把每一步都执行完成，然后启动微信    
+没有关闭SIP，查看文件 https://github.com/yincongcyincong/weixin-macos/blob/main/frida-gadget/readme.md    
+把每一步都执行完成，然后启动微信    
 ```
 frida -U -n Gadget -l frida/succ.js
 ```
