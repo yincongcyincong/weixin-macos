@@ -1,2 +1,1 @@
-
-
+触发 STNManager__MMStartTask 

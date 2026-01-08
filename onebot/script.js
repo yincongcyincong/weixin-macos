@@ -6,20 +6,21 @@ if (!baseAddr) {
 console.log("[+] WeChat base address: " + baseAddr);
 
 // 触发函数地址,不同版本的地址看wechat_version 中的json文件复制过来
-var triggerFuncAddr = baseAddr.add();
-var sendMessageCallbackFunc = baseAddr.add();
-var messageCallbackFunc1 = baseAddr.add();
-var messageCallbackFunc2 = baseAddr.add();
-var messageCallbackFunc3 = baseAddr.add();
-var messageCallbackFunc4 = baseAddr.add();
+var sendMessageCallbackFunc = ptr(0);
+var messageCallbackFunc1 = baseAddr.add(0x7fa1050);
+var messageCallbackFunc2 = baseAddr.add(0x7fa10a8);
+var messageCallbackFunc3 = baseAddr.add(0x80335b0);
+var messageCallbackFunc4 = baseAddr.add(0x80336a0);
 
 // 这个必须是绝对位置
-var triggerX1Payload = ptr();
+var triggerX1Payload = ptr(0x175ED6600);
+var triggerFuncAddr = baseAddr.add(0x448A858);
 var req2bufEnterAddr = baseAddr.add(0x34566C0);
-var req2bufExitAddr = baseAddr.add(0x34577B8);
+var req2bufExitAddr = baseAddr.add(0x34577D8);
 var protobufAddr = baseAddr.add(0x227EC70);
-var receiveAddr = baseAddr.add();
-var patchProtobufAddr = baseAddr.add(0x227EC70);
+var buf2RespAddr = baseAddr.add(0x347BD44);
+var patchProtobufAddr = baseAddr.add(0x227EC4C);
+var protobufDeleteAddr = baseAddr.add(0x227EC88);
 
 // 触发函数X0参数地址
 var globalMessagePtr = ptr(0);
@@ -28,6 +29,7 @@ var globalMessagePtr = ptr(0);
 var cgiAddr = ptr(0);
 var callBackFuncAddr = ptr(0);
 var sendMessageAddr = ptr(0);
+var messageAddr = ptr(0);
 
 var contentAddr = ptr(0);
 var insertMsgAddr = ptr(0);
@@ -68,6 +70,7 @@ function setupSendMessageDynamic() {
     cgiAddr = Memory.alloc(128);
     callBackFuncAddr = Memory.alloc(16);
     sendMessageAddr = Memory.alloc(256);
+    messageAddr = Memory.alloc(256);
     contentAddr = Memory.alloc(255);
     receiverAddr = Memory.alloc(24);
 
@@ -79,7 +82,7 @@ function setupSendMessageDynamic() {
     // B. 构建 SendMessage 结构体 (X24 基址位置)
     sendMessageAddr.add(0x00).writeU64(0);
     sendMessageAddr.add(0x08).writeU64(0);
-    sendMessageAddr.add(0x10).writePointer(sendMessageCallbackFunc); // 虚表地址通常仍需硬编码或从模块基址计算
+    sendMessageAddr.add(0x10).writePointer(sendMessageCallbackFunc);
     sendMessageAddr.add(0x18).writeU64(1);
     sendMessageAddr.add(0x20).writeU32(taskIdGlobal);
     sendMessageAddr.add(0x28).writePointer(messageAddr); // 指向动态分配的 Message
@@ -117,7 +120,6 @@ function setupSendMessageDynamic() {
     messageAddr.add(0xe0).writeU64(0x1);
     messageAddr.add(0xe8).writePointer(messageCallbackFunc4);
 
-
     console.log(" [+] messageAddr Object: ", hexdump(messageAddr, {
         offset: 0,
         length: 64,
@@ -125,64 +127,34 @@ function setupSendMessageDynamic() {
         ansi: true
     }));
 
-    console.log(" [+] Dynamic Memory Setup Complete. - Message Object: " + messageAddr);
+    console.log("[+] Dynamic Memory Setup Complete. - Message Object: " + messageAddr);
 }
 
 setImmediate(setupSendMessageDynamic);
 
-// 设置trigger函数的x0参数
-function setTriggerAttach() {
-    console.log("[+] WeChat Base: " + baseAddr + "[+] Attaching to: " + triggerFuncAddr);
-
-    // 3. 开始拦截
-    Interceptor.attach(triggerFuncAddr, {
-        onEnter: function (args) {
-            console.log("[+] Entered Function: 0x10444A99C");
-
-            if (!globalMessagePtr.isNull()) {
-                return;
-            }
-
-            globalMessagePtr = this.context.x0;
-            console.log("[+] globalMessagePtr 当前 X0 的指针值: " + globalMessagePtr);
-        },
-        onLeave: function (retval) {
-        }
-    });
-}
-
-// 使用 setImmediate 确保在模块加载后执行
-setImmediate(setTriggerAttach);
-
 
 function patchProtoBuf() {
-    Interceptor.attach(patchProtobufAddr, {
-        onEnter: function (args) {
-            var sp = this.context.sp;
-            var firstValue = sp.readU32();
-            if (firstValue !== taskIdGlobal) {
-                console.log("[+] Patch Protobuf 拦截未命中，跳过...");
-                return;
-            }
-
-            this.context.pc = patchProtoBufAddr.add(4);
-
-        },
-        onLeave: function (retval) {
-
-        }
+    Memory.patchCode(patchProtobufAddr, 4, code => {
+        const cw = new Arm64Writer(code, {pc: patchProtobufAddr});
+        cw.putNop();
+        cw.flush();
     });
+
+    console.log("[+] Patching BL to NOP at " + patchProtobufAddr + " completed.");
+
+    Memory.patchCode(protobufDeleteAddr, 4, code => {
+        const cw = new Arm64Writer(code, {pc: protobufDeleteAddr});
+        cw.putNop();
+        cw.flush();
+    });
+
+    console.log("[+] Patching BL DELETE to NOP at " + protobufDeleteAddr + " completed.");
 }
 
 setImmediate(patchProtoBuf);
 
 function manualTrigger(taskId, receiver, content) {
     console.log("[+] Manual Trigger Started...");
-    if (globalMessagePtr.isNull()) {
-        console.error("[!] globalMessagePtr is NULL, cannot trigger!");
-        return "fail";
-    }
-
     if (!taskId || !receiver || !content) {
         console.error("[!] taskId or Receiver or Content is empty!");
         return "fail";
@@ -203,7 +175,8 @@ function manualTrigger(taskId, receiver, content) {
 
     messageAddr.add(0x08).writeU32(taskIdGlobal);
     sendMessageAddr.add(0x20).writeU32(taskIdGlobal);
-    messageAddrAddr.add(0x18).writeU32(timestamp);
+
+    console.log("start init payload")
 
     const payloadData = [
         0x0A, 0x02, 0x00, 0x00,                         // 0x00
@@ -265,15 +238,17 @@ function manualTrigger(taskId, receiver, content) {
     triggerX1Payload.add(0x04).writeByteArray(payloadData);
     triggerX1Payload.add(0x18).writePointer(cgiAddr);
 
-    const sub_10444A99C = new NativeFunction(triggerFuncAddr, 'uint64', ['pointer', 'pointer']);
+    console.log("finished init payload")
+
+    const MMStartTask = new NativeFunction(triggerFuncAddr, 'int64', ['pointer']);
 
     // 5. 调用函数
     try {
-        const arg1 = globalMessagePtr; // 第一个指针参数
+        // const arg1 = globalMessagePtr; // 第一个指针参数
         const arg2 = triggerX1Payload; // 第二个参数 0x175ED6600
-        console.log(`[+] Calling trigger function  at ${triggerFuncAddr} with args: (${arg1}, ${arg2})`);
-        const result = sub_10444A99C(arg1, arg2);
-        console.log("[+] Execution trigger function  Success. Return value: " + result);
+        console.log(`[+] Calling MMStartTask  at ${triggerFuncAddr} with args: (${arg2})`);
+        const result = MMStartTask(arg2);
+        console.log("[+] Execution MMStartTask  Success. Return value: " + result);
         return "ok";
     } catch (e) {
         console.error("[!] Error trigger function  during execution: " + e);
@@ -299,14 +274,7 @@ function attachReq2buf() {
             // 3. 获取 X24 寄存器的值
             const x24_base = this.context.x24;
             insertMsgAddr = x24_base.add(0x60);
-
             console.log("[+] 当前 Req2Buf X24 基址: " + x24_base);
-            console.log("[+] 准备修改位置 Req2Buf (X24 + 0x60): " + insertMsgAddr, hexdump(insertMsgAddr, {
-                offset: 0,
-                length: 16,
-                header: true,
-                ansi: true
-            }));
 
             if (typeof sendMessageAddr !== 'undefined') {
                 insertMsgAddr.writePointer(sendMessageAddr);
@@ -338,7 +306,7 @@ function attachReq2buf() {
                 return;
             }
             insertMsgAddr.writeU64(0x0);
-            console.log("[+] 0x1033EFA00 清空写入后内存预览: " + insertMsgAddr.readPointer());
+            console.log("[+] 清空写入后内存预览: " + insertMsgAddr.readPointer());
             taskIdGlobal = 0;
             receiverGlobal = "";
             contentGlobal = "";
@@ -453,7 +421,7 @@ function attachProto() {
                 header: true,
                 ansi: true
             }));
-        }
+        },
     });
 }
 
@@ -470,61 +438,70 @@ function toVarint(n) {
 setImmediate(attachProto);
 
 function setReceiver() {
-    console.log("[+] setReceiver WeChat Base: " + baseAddr + "[+] Attaching to: " + receiveAddr);
+    console.log("[+] buf2RespAddr WeChat Base: " + baseAddr + "[+] Attaching to: " + buf2RespAddr);
 
     // 3. 开始拦截
-    Interceptor.attach(receiveAddr, {
+    Interceptor.attach(buf2RespAddr, {
         onEnter: function (args) {
-            console.log("[+] Entered Receive Function: 0x1023B5348");
-            const x1 = this.context.x1;
-            var sender = x1.add(0x18).readUtf8String();
-            var receiver = x1.add(0x30).readUtf8String();
-            var senderUser = x1.add(0x48).readUtf8String();
 
-            // 3. 从 0xd0 开始处理
-            var d0Pos = x1.add(0xd0);
-            var strD0 = "";
-
-            if (isPrintableOrChinese(d0Pos)) {
-                strD0 = d0Pos.readUtf8String();
-                console.log("[+] 0xd0 处不是指针，直接读取完毕");
-            } else {
-                // 情况 B：不符合特征（如包含乱码位或指针特征），视为指针
-                var ptrD0 = d0Pos.readPointer();
-                if (!ptrD0.isNull() && Process.findRangeByAddress(ptrD0)) {
-                    strD0 = ptrD0.readUtf8String();
-                    console.log("[+] 0xd0 识别为：指针跳转读取");
-                } else {
-                    strD0 = "Invalid Data/Pointer";
-                }
+            const currentPtr = this.context.x1;
+            let senderLen = currentPtr.add(0x1e).readU8();
+            if (senderLen !== 0x14 && senderLen !== 0x13) {
+                return
             }
+
+            console.log("[+] Entered Receive Function: 0x1023B5348");
+
+            let senderPtr = currentPtr.add(0x1e + 1);
+            let sender = senderPtr.readUtf8String(senderLen);
+
+            let receiverLenPtr = senderPtr.add(senderLen).add(3);
+            let receiverLen = receiverLenPtr.readU8();
+            let receiverStrPtr = receiverLenPtr.add(1);
+            let receiver = receiverStrPtr.readUtf8String(receiverLen);
+
+            let contentLenPtr = receiverStrPtr.add(receiverLen).add(5);
+            let contentLen = contentLenPtr.readU8();
+            let contentPtr = contentLenPtr.add(1);
+            var content = contentPtr.readUtf8String(contentLen);
 
             var selfId = receiver
             var msgType = "private"
             var groupId = ""
-            if (receiver.includes("@chatroom")) {
-                msgType = "group"
-                groupId = receiver
-                selfId = senderUser
-            }
+            var senderUser = sender
+            var messages = [];
+            messages.push({type: "text", data: {text: content}});
+
             if (sender.includes("@chatroom")) {
                 msgType = "group"
                 groupId = sender
-            }
+                let splitIndex = -1;
+                for (let i = 0; i < content.length; i++) {
+                    if (content[i] === ':') {
+                        splitIndex = i;
+                        break;
+                    }
+                }
 
-            var delimiter = ":\n";
-            var index = strD0.indexOf(delimiter);
-            if (index !== -1) {
-                strD0 = strD0.substring(index + delimiter.length).trim();
-            }
-            var parts = strD0.split('\u2005');
-            var messages = [];
-            for (let part of parts) {
-                part = part.trim();
-                if (part.startsWith("@")) {
-                    messages.push({type: "at", data: {qq: selfId}});
-                } else {
-                    messages.push({type: "text", data: {text: part}});
+                senderUser = content.substring(0, splitIndex).trim();
+                content = content.substring(splitIndex + 2).trim();
+
+                messages = [];
+                const parts = content.split('\u2005');
+                for (let part of parts) {
+                    part = part.trim();
+                    if (!part.startsWith("@")) {
+                        messages.push({type: "text", data: {text: part}});
+                    }
+                }
+
+                const xmlPtr = contentPtr.add(contentLen).add(15);
+                const xmlLenValue = readVarint(xmlPtr)
+                const xml = xmlPtr.add(xmlLenValue.byteLength).readUtf8String(xmlLenValue.value);
+                const atUserMatch = xml.match(/<atuserlist>([\s\S]*?)<\/atuserlist>/);
+                const atUser = atUserMatch ? atUserMatch[1] : null;
+                if (atUser) {
+                    messages.push({type: "at", data: {qq: atUser}});
                 }
             }
 
@@ -545,37 +522,28 @@ function setReceiver() {
 // 使用 setImmediate 确保在模块加载后执行
 setImmediate(setReceiver)
 
-/**
- * 扫描内存直到 \0，判断中间内容是否全部为可见字符或汉字
- */
-function isPrintableOrChinese(startPtr) {
-    let offset = 0;
-    const maxScanLength = 8;
+function readVarint(addr) {
+    let value = 0;
+    let shift = 0;
+    let count = 0;
 
-    while (offset < maxScanLength) {
-        let b = startPtr.add(offset).readU8();
+    while (true) {
+        let byte = addr.add(count).readU8();
+        // 取低7位进行累加
+        value |= (byte & 0x7f) << shift;
+        count++; // 消耗了一个字节
 
-        if (b === 0) {
-            // 扫描到 \0，且之前没有发现异常字节
-            return offset > 0; // 如果第一个就是 \0，视为非字符串（可能是空指针）
-        }
+        // 如果最高位是0，跳出循环
+        if ((byte & 0x80) === 0) break;
 
-        // 判定逻辑：
-        // 1. 可见 ASCII (32-126) 或 换行/制表符 (9, 10, 13)
-        let isAscii = (b >= 32 && b <= 126) || (b === 9 || b === 10 || b === 13);
-
-        // 2. 汉字 UTF-8 特征：第一个字节通常 >= 0x80 (128)
-        // 严谨点：UTF-8 汉字首字节通常在 0xE4-0xE9 之间，后续字节在 0x80-0xBF 之间
-        // 这里简化处理：如果是高位字符，我们暂时放行，由 readUtf8String 最终处理
-        let isHighBit = (b >= 0x80);
-
-        if (!isAscii && !isHighBit) {
-            // 发现既不是 ASCII 也不是高位字节（如 0x01-0x1F 的控制字符），判定为指针
-            return false;
-        }
-        offset++;
+        shift += 7;
+        if (count > 5) return -1; // 安全校验，防止死循环
     }
-    return true;
+
+    return {
+        value: value,      // 最终长度数值 (例如 251)
+        byteLength: count  // 长度字段占用的字节数 (例如 2)
+    };
 }
 
 
