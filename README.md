@@ -26,3 +26,16 @@ hook2是对Req2Buf这个函数进行消息体注入，因为hook1触发的时候
 hook4是在Req2Buf，清除掉消息体的内容，因为后序在OnTaskEnd会回收内存，如果我这边消息体还在整个的指针上就会被清除，但是这个线程不认识这块内存，整个程序就会crash。
 
 查看：./frida/succ.js
+
+## 图片消息
+```
+发送一张图片,为了让函数找到X0寄存器的数据。
+
+mkdir -p "/Users/yincong/Library/Containers/com.tencent.xinWeChat/Data/Documents/xwechat_files/wxid_xxx/temp/xxx/2026-01/Img/"
+cp /Users/yincong/Desktop/1.png /Users/yincong/Library/Containers/com.tencent.xinWeChat/Data/Documents/xwechat_files/wxid_xxx/temp/xxx/2026-01/Img/xxx.jpg
+
+
+manualUpload("wxid_7wd1ece99f7i21", "8dd4755e12e052fa5647a883e6bf0783", "/Users/yincong/Library/Containers/com.tencent.xinWeChat/Data/Documents/xwechat_files/wxid_xxx/temp/xxx/2026-01/Img/xxx.jpg")
+manualTrigger(0x20000199, "wxid_xxx","wxid_xxx")
+
+```

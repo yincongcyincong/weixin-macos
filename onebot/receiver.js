@@ -1,3 +1,9 @@
+var baseAddr = Process.getModuleByName("WeChat").base;
+if (!baseAddr) {
+    console.error("[!] 找不到 WeChat 模块基址，请检查进程名。");
+}
+console.log("[+] WeChat base address: " + baseAddr);
+
 function setReceiver() {
     var buf2RespAddr = baseAddr.add(0x347BD44);
     console.log("[+] buf2RespAddr WeChat Base: " + baseAddr + "[+] Attaching to: " + buf2RespAddr);
@@ -153,7 +159,3 @@ function generateAESKey() {
     }
     return key;
 }
-
-rpc.exports = {
-    manualTrigger: manualTrigger
-};

@@ -7,38 +7,26 @@ console.log("[+] WeChat base address: " + baseAddr);
 
 
 // 触发函数地址,不同版本的地址看wechat_version 中的json文件复制过来
-var sendMessageCallbackFunc = ptr(0x0);
-var messageCallbackFunc1 = baseAddr.add(0x7fa0b18);
+var sendImgMessageCallbackFunc = ptr(0x0);
+var imgMessageCallbackFunc1 = baseAddr.add(0x7fa0b18);
+var CndOnCompleteAddr = baseAddr.add(0x34154E0);
 
 // 这个必须是绝对位置
 var triggerX1Payload = ptr(0x175ED6600);
 var triggerFuncAddr = baseAddr.add(0x448A858);
 var req2bufEnterAddr = baseAddr.add(0x34566C0);
 var req2bufExitAddr = baseAddr.add(0x34577D8);
-var protobufAddr = baseAddr.add(0x2275BFC);
-var patchProtobufFunc1 = baseAddr.add(0x2275BB8)
-var patchProtobufFunc2 = baseAddr.add(0x2275BD8);
-var protobufDeleteAddr = baseAddr.add(0x2275C14);
-var CndOnCompleteAddr = baseAddr.add(0x34154E0);
-
-var runReadWriteAddr = baseAddr.add(0x450F518)
-var runReadWriteAddr1 = baseAddr.add(0x450F51C);
-
-// 触发函数X0参数地址
-var globalMessagePtr = ptr(0);
+var imgProtobufAddr = baseAddr.add(0x2275BFC);
+var patchImgProtobufFunc1 = baseAddr.add(0x2275BB8)
+var patchImgProtobufFunc2 = baseAddr.add(0x2275BD8);
+var imgProtobufDeleteAddr = baseAddr.add(0x2275C14);
 
 // 消息体的一些指针地址
-var cgiAddr = ptr(0);
-var callBackFuncAddr = ptr(0);
-var callBackFuncAddr2 = ptr(0);
-var callBackFuncAddr3 = ptr(0);
-
-var sendMessageAddr = ptr(0);
-var messageAddr = ptr(0);
+var imgCgiAddr = ptr(0);
+var sendImgMessageAddr = ptr(0);
+var imgMessageAddr = ptr(0);
 var contentAddr = ptr(0);
 var insertMsgAddr = ptr(0);
-var receiverAddr = ptr(0);
-var htmlContentAddr = ptr(0);
 var protoX1PayloadAddr = ptr(0);
 
 // 消息的taskId
@@ -46,51 +34,54 @@ var taskIdGlobal = 0x20000090 // 最好比较大，不和原始的微信消息�
 var receiverGlobal = "wxid_7wd1ece99f7i21"
 var senderGlobal = "wxid_ldftuhe36izg19"
 var lastSendTime = 0;
+
 var globalImageCdnKey = "";
 var globalAesKey1 = "";
 var globalMd5Key = "";
+var uploadGlobalX0 = ptr(0)
+var uploadFunc1Addr = ptr(0)
+var uploadFunc2Addr = ptr(0)
+var imageIdAddr = ptr(0)
+var md5Addr = ptr(0)
+var uploadAesKeyAddr = ptr(0)
+var ImagePathAddr1 = ptr(0)
+var uploadImagePayload = ptr(0);
 
-// 打印消息的地址，便于查询问题
-function printAddr() {
-    console.log("[+] Addresses:");
-    console.log("    - cgiAddr: " + cgiAddr);
-    console.log("    - callBackFuncAddr: " + callBackFuncAddr);
-    console.log("    - sendMessageAddr: " + sendMessageAddr);
-    console.log("    - contentAddr: " + contentAddr);
-    console.log("    - globalMessagePtr: " + globalMessagePtr);
-    console.log("    - triggerX1Payload: " + triggerX1Payload);
-}
 
 // 初始化进行内存的分配
-function setupSendMessageDynamic() {
-    console.log("[+] Starting Dynamic Message Patching...");
+function setupSendImgMessageDynamic() {
+    console.log("[+] Starting setupSendImgMessageDynamic Dynamic Message Patching...");
 
     // 1. 动态分配内存块（按需分配大小）
     // 分配原则：字符串给 64-128 字节，结构体按实际大小分配
-    cgiAddr = Memory.alloc(128);
-    callBackFuncAddr = Memory.alloc(16);
-    callBackFuncAddr2 = Memory.alloc(16);
-    callBackFuncAddr3 = Memory.alloc(16);
-    sendMessageAddr = Memory.alloc(256);
-    messageAddr = Memory.alloc(512);
+    imgCgiAddr = Memory.alloc(128);
+    sendImgMessageAddr = Memory.alloc(256);
+    imgMessageAddr = Memory.alloc(512);
     contentAddr = Memory.alloc(16);
-    receiverAddr = Memory.alloc(24);
-    htmlContentAddr = Memory.alloc(24);
+
+    uploadFunc1Addr = Memory.alloc(16);
+    uploadFunc2Addr = Memory.alloc(16);
+    imageIdAddr = Memory.alloc(128);
+    md5Addr = Memory.alloc(128);
+    uploadAesKeyAddr = Memory.alloc(128);
+    ImagePathAddr1 = Memory.alloc(128);
+    uploadImagePayload = Memory.alloc(512);
+
 
 
     // A. 写入字符串内容
-    patchString(cgiAddr, "/cgi-bin/micromsg-bin/uploadmsgimg");
+    patchString(imgCgiAddr, "/cgi-bin/micromsg-bin/uploadmsgimg");
     patchString(contentAddr, " ");
 
     // B. 构建 SendMessage 结构体 (X24 基址位置)
-    sendMessageAddr.add(0x00).writeU64(0);
-    sendMessageAddr.add(0x08).writeU64(0);
-    sendMessageAddr.add(0x10).writePointer(sendMessageCallbackFunc);
-    sendMessageAddr.add(0x18).writeU64(1);
-    sendMessageAddr.add(0x20).writeU32(taskIdGlobal);
-    sendMessageAddr.add(0x28).writePointer(messageAddr);
+    sendImgMessageAddr.add(0x00).writeU64(0);
+    sendImgMessageAddr.add(0x08).writeU64(0);
+    sendImgMessageAddr.add(0x10).writePointer(sendImgMessageCallbackFunc);
+    sendImgMessageAddr.add(0x18).writeU64(1);
+    sendImgMessageAddr.add(0x20).writeU32(taskIdGlobal);
+    sendImgMessageAddr.add(0x28).writePointer(imgMessageAddr);
 
-    console.log(" [+] sendMessageAddr Object: ", hexdump(sendMessageAddr, {
+    console.log(" [+] sendImgMessageAddr Object: ", hexdump(sendImgMessageAddr, {
         offset: 0,
         length: 48,
         header: true,
@@ -98,52 +89,49 @@ function setupSendMessageDynamic() {
     }));
 
     // C. 构建 Message 结构体
-    messageAddr.add(0x00).writePointer(messageCallbackFunc1);
-    messageAddr.add(0x08).writeU32(taskIdGlobal);
-    messageAddr.add(0x0c).writeU32(0x6e);
-    messageAddr.add(0x10).writeU64(0x3);
-    messageAddr.add(0x18).writePointer(cgiAddr);
-    messageAddr.add(0x20).writeU64(0x22);
-    messageAddr.add(0x28).writeU64(uint64("0x8000000000000030"));
-    messageAddr.add(0x30).writeU64(uint64("0x0000000001010100"));
+    imgMessageAddr.add(0x00).writePointer(imgMessageCallbackFunc1);
+    imgMessageAddr.add(0x08).writeU32(taskIdGlobal);
+    imgMessageAddr.add(0x0c).writeU32(0x6e);
+    imgMessageAddr.add(0x10).writeU64(0x3);
+    imgMessageAddr.add(0x18).writePointer(imgCgiAddr);
+    imgMessageAddr.add(0x20).writeU64(0x22);
+    imgMessageAddr.add(0x28).writeU64(uint64("0x8000000000000030"));
+    imgMessageAddr.add(0x30).writeU64(uint64("0x0000000001010100"));
 
-    console.log(" [+] messageAddr Object: ", hexdump(messageAddr, {
-        offset: 0,
-        length: 64,
-        header: true,
-        ansi: true
-    }));
+    console.log(" [+] Dynamic Memory Setup Complete. - Message Object: " + imgMessageAddr);
 
-    console.log(" [+] Dynamic Memory Setup Complete. - Message Object: " + messageAddr);
+
+    uploadFunc1Addr.writePointer(baseAddr.add(0x802b8b0));
+    uploadFunc2Addr.writePointer(baseAddr.add(0x7fd5908));
 }
 
-setImmediate(setupSendMessageDynamic);
+setImmediate(setupSendImgMessageDynamic);
 
 
 function patchProtoBuf() {
-    Memory.patchCode(patchProtobufFunc1, 4, code => {
-        const cw = new Arm64Writer(code, {pc: patchProtobufFunc1});
+    Memory.patchCode(patchImgProtobufFunc1, 4, code => {
+        const cw = new Arm64Writer(code, {pc: patchImgProtobufFunc1});
         cw.putNop();
         cw.flush();
     });
 
-    console.log("[+] Patching BL to NOP at " + patchProtobufFunc1 + " completed.");
+    console.log("[+] Patching BL to NOP at " + patchImgProtobufFunc1 + " completed.");
 
-    Memory.patchCode(patchProtobufFunc2, 4, code => {
-        const cw = new Arm64Writer(code, {pc: patchProtobufFunc2});
+    Memory.patchCode(patchImgProtobufFunc2, 4, code => {
+        const cw = new Arm64Writer(code, {pc: patchImgProtobufFunc2});
         cw.putNop();
         cw.flush();
     });
 
-    console.log("[+] Patching BL to NOP at " + patchProtobufFunc2 + " completed.");
+    console.log("[+] Patching BL to NOP at " + patchImgProtobufFunc2 + " completed.");
 
-    Memory.patchCode(protobufDeleteAddr, 4, code => {
-        const cw = new Arm64Writer(code, {pc: protobufDeleteAddr});
+    Memory.patchCode(imgProtobufDeleteAddr, 4, code => {
+        const cw = new Arm64Writer(code, {pc: imgProtobufDeleteAddr});
         cw.putNop();
         cw.flush();
     });
 
-    console.log("[+] Patching BL DELETE to NOP at " + protobufDeleteAddr + " completed.");
+    console.log("[+] Patching BL DELETE to NOP at " + imgProtobufDeleteAddr + " completed.");
 }
 
 setImmediate(patchProtoBuf);
@@ -162,8 +150,8 @@ function manualTrigger(taskId, sender, receiver) {
     receiverGlobal = receiver;
     senderGlobal = sender;
 
-    messageAddr.add(0x08).writeU32(taskIdGlobal);
-    sendMessageAddr.add(0x20).writeU32(taskIdGlobal);
+    imgMessageAddr.add(0x08).writeU32(taskIdGlobal);
+    sendImgMessageAddr.add(0x20).writeU32(taskIdGlobal);
 
     console.log("start init payload")
 
@@ -225,7 +213,7 @@ function manualTrigger(taskId, sender, receiver) {
     // 从 0x175ED6604 开始写入 Payload
     triggerX1Payload.writeU32(taskIdGlobal);
     triggerX1Payload.add(0x04).writeByteArray(payloadData);
-    triggerX1Payload.add(0x18).writePointer(cgiAddr);
+    triggerX1Payload.add(0x18).writePointer(imgCgiAddr);
 
     console.log("finished init payload")
 
@@ -233,7 +221,6 @@ function manualTrigger(taskId, sender, receiver) {
 
     // 5. 调用函数
     try {
-        // const arg1 = globalMessagePtr; // 第一个指针参数
         const arg2 = triggerX1Payload; // 第二个参数 0x175ED6600
         console.log(`[+] Calling MMStartTask  at ${triggerFuncAddr} with args: (${arg2})`);
         const result = MMStartTask(arg2);
@@ -265,9 +252,9 @@ function attachReq2buf() {
             insertMsgAddr = x24_base.add(0x60);
             console.log("[+] 当前 Req2Buf X24 基址: " + x24_base);
 
-            if (typeof sendMessageAddr !== 'undefined') {
-                insertMsgAddr.writePointer(sendMessageAddr);
-                console.log("[+] 成功! Req2Buf 已将 X24+0x60 指向新地址: " + sendMessageAddr +
+            if (typeof sendImgMessageAddr !== 'undefined') {
+                insertMsgAddr.writePointer(sendImgMessageAddr);
+                console.log("[+] 成功! Req2Buf 已将 X24+0x60 指向新地址: " + sendImgMessageAddr +
                     "[+] Req2Buf 写入后内存预览: " + insertMsgAddr);
                 console.log(hexdump(insertMsgAddr, {
                     offset: 0,
@@ -275,7 +262,7 @@ function attachReq2buf() {
                     header: true,
                     ansi: true
                 }))
-                console.log(hexdump(sendMessageAddr, {
+                console.log(hexdump(sendImgMessageAddr, {
                     offset: 0,
                     length: 48,
                     header: true,
@@ -319,11 +306,11 @@ function stringToHexArray(str) {
 
 // 拦截 Protobuf 编码逻辑，注入自定义 Payload
 function attachProto() {
-    console.log("[+] proto注入拦截目标地址: " + protobufAddr);
+    console.log("[+] proto注入拦截目标地址: " + protoX1PayloadAddr);
     protoX1PayloadAddr = Memory.alloc(1024);
     console.log("[+] Frida 分配的 Payload 地址: " + protoX1PayloadAddr);
 
-    Interceptor.attach(protobufAddr, {
+    Interceptor.attach(imgProtobufAddr, {
         onEnter: function (args) {
             console.log("[+] Protobuf 拦截命中");
 
@@ -450,50 +437,6 @@ function toVarint(n) {
     return res;
 }
 
-function patchCdnOnComplete() {
-    Interceptor.attach(CndOnCompleteAddr, {
-        onEnter: function (args) {
-            console.log("[+] enter CndOnCompleteAddr");
-
-            try {
-                const x2 = this.context.x2;
-                globalImageCdnKey = x2.add(0x60).readPointer().readUtf8String();
-                globalAesKey1 = x2.add(0x78).readPointer().readUtf8String();
-                globalMd5Key = x2.add(0x90).readPointer().readUtf8String();
-                console.log("[+] globalImageCdnKey: " + globalImageCdnKey + " globalAesKey1: " + globalAesKey1 + " globalAesKey2: " + globalMd5Key);
-            } catch (e) {
-                console.log("[-] Memory access error at onEnter: " + e);
-            }
-        }
-    })
-}
-
-setImmediate(patchCdnOnComplete)
-
-var uploadGlobalX0 = ptr(0)
-var uploadFunc1Addr = ptr(0)
-var uploadFunc2Addr = ptr(0)
-var imageIdAddr = ptr(0)
-var md5Addr = ptr(0)
-var uploadAesKeyAddr = ptr(0)
-var ImagePathAddr1 = ptr(0)
-var uploadImagePayload = ptr(0);
-
-function initMemo() {
-    uploadFunc1Addr = Memory.alloc(24);
-    uploadFunc2Addr = Memory.alloc(24);
-    imageIdAddr = Memory.alloc(256);
-    md5Addr = Memory.alloc(256);
-    uploadAesKeyAddr = Memory.alloc(256);
-    ImagePathAddr1 = Memory.alloc(256);
-    uploadImagePayload = Memory.alloc(512);
-
-
-    uploadFunc1Addr.writePointer(baseAddr.add(0x802b8b0));
-    uploadFunc2Addr.writePointer(baseAddr.add(0x7fd5908));
-}
-
-setImmediate(initMemo)
 
 
 function manualUpload(receiver, md5, imagePath) {
@@ -641,6 +584,26 @@ function generateAESKey() {
     return key;
 }
 
+
+function patchCdnOnComplete() {
+    Interceptor.attach(CndOnCompleteAddr, {
+        onEnter: function (args) {
+            console.log("[+] enter CndOnCompleteAddr");
+
+            try {
+                const x2 = this.context.x2;
+                globalImageCdnKey = x2.add(0x60).readPointer().readUtf8String();
+                globalAesKey1 = x2.add(0x78).readPointer().readUtf8String();
+                globalMd5Key = x2.add(0x90).readPointer().readUtf8String();
+                console.log("[+] globalImageCdnKey: " + globalImageCdnKey + " globalAesKey1: " + globalAesKey1 + " globalAesKey2: " + globalMd5Key);
+            } catch (e) {
+                console.log("[-] Memory access error at onEnter: " + e);
+            }
+        }
+    })
+}
+
+setImmediate(patchCdnOnComplete)
 
 rpc.exports = {
     manualTrigger: manualTrigger,
