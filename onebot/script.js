@@ -83,6 +83,58 @@ function generateAESKey() {
 }
 
 
+function readVarint(addr) {
+    let value = 0;
+    let shift = 0;
+    let count = 0;
+
+    while (true) {
+        let byte = addr.add(count).readU8();
+        // 取低7位进行累加
+        value |= (byte & 0x7f) << shift;
+        count++; // 消耗了一个字节
+
+        // 如果最高位是0，跳出循环
+        if ((byte & 0x80) === 0) break;
+
+        shift += 7;
+        if (count > 5) return -1; // 安全校验，防止死循环
+    }
+
+    return {
+        value: value,      // 最终长度数值 (例如 251)
+        byteLength: count  // 长度字段占用的字节数 (例如 2)
+    };
+}
+
+function isPrintableOrChinese(startPtr, maxScanLength) {
+    let offset = 0;
+    while (offset < maxScanLength) {
+        let b = startPtr.add(offset).readU8();
+
+        if (b === 0) {
+            // 扫描到 \0，且之前没有发现异常字节
+            return offset > 0; // 如果第一个就是 \0，视为非字符串（可能是空指针）
+        }
+
+        // 判定逻辑：
+        // 1. 可见 ASCII (32-126) 或 换行/制表符 (9, 10, 13)
+        let isAscii = (b >= 32 && b <= 126) || (b === 9 || b === 10 || b === 13);
+
+        // 2. 汉字 UTF-8 特征：第一个字节通常 >= 0x80 (128)
+        // 严谨点：UTF-8 汉字首字节通常在 0xE4-0xE9 之间，后续字节在 0x80-0xBF 之间
+        // 这里简化处理：如果是高位字符，我们暂时放行，由 readUtf8String 最终处理
+        let isHighBit = (b >= 0x80);
+
+        if (!isAscii && !isHighBit) {
+            // 发现既不是 ASCII 也不是高位字节（如 0x01-0x1F 的控制字符），判定为指针
+            return false;
+        }
+        offset++;
+    }
+    return true;
+}
+
 // -------------------------基础函数分区-------------------------
 
 // -------------------------全局变量分区-------------------------
@@ -106,6 +158,7 @@ var req2bufExitAddr = baseAddr.add(0x34577D8);
 var sendFuncAddr = baseAddr.add(0x448A858);
 var insertMsgAddr = ptr(0);
 var sendMsgType = "";
+var buf2RespAddr = baseAddr.add(0x347BD44);
 
 // 图片消息全局变量
 var sendImgMessageCallbackFunc = ptr(0x0);
@@ -211,7 +264,7 @@ function patchTextProtoBuf() {
     console.log("[+] Patching PatchTextProtobufDeleteAddr " + PatchTextProtobufDeleteAddr + " 成功.");
 }
 
-setTimeout(function() {
+setTimeout(function () {
     console.log("[+] 3秒等待结束，准备执行 Patch...");
     patchTextProtoBuf();
 }, 3000);
@@ -375,13 +428,7 @@ function attachSendTextProto() {
 
 setImmediate(attachSendTextProto);
 
-
-rpc.exports = {
-    triggerSendTextMessage: triggerSendTextMessage
-};
-
 // -------------------------发送文本消息分区-------------------------
-
 
 
 // -------------------------Req2Buf公共部分分区-------------------------
@@ -528,10 +575,10 @@ function patchImgProtoBuf() {
 }
 
 
-setTimeout(function() {
-    console.log("[+] 5秒等待结束，准备执行 Patch...");
+setTimeout(function () {
+    console.log("[+] 2秒等待结束，准备执行 Patch...");
     patchImgProtoBuf();
-}, 5000);
+}, 2000);
 
 function triggerSendImgMessage(taskId, sender, receiver) {
     console.log("[+] Manual Trigger Started...");
@@ -744,7 +791,6 @@ function attachProto() {
 setImmediate(attachProto);
 
 
-
 function triggerUploadImg(receiver, md5, imagePath) {
     const payload = [
         0x20, 0x05, 0x33, 0x8C, 0x0B, 0x00, 0x00, 0x00, // 函数 10802b8b0 的指针
@@ -849,10 +895,10 @@ function triggerUploadImg(receiver, md5, imagePath) {
 
 
     const targetAddr = baseAddr.add(0x45DC834);
-    const startC2cUpload = new NativeFunction(targetAddr, 'int64', ['pointer', 'pointer']);
+    const startUploadMedia = new NativeFunction(targetAddr, 'int64', ['pointer', 'pointer']);
 
     console.log("开始手动触发 C2C 上传...");
-    const result = startC2cUpload(uploadGlobalX0, uploadImagePayload);
+    const result = startUploadMedia(uploadGlobalX0, uploadImagePayload);
     console.log("调用结果: " + result);
 }
 
@@ -879,7 +925,13 @@ function patchCdnOnComplete() {
                 globalImageCdnKey = x2.add(0x60).readPointer().readUtf8String();
                 globalAesKey1 = x2.add(0x78).readPointer().readUtf8String();
                 globalMd5Key = x2.add(0x90).readPointer().readUtf8String();
-                console.log("[+] globalImageCdnKey: " + globalImageCdnKey + " globalAesKey1: " + globalAesKey1 + " globalAesKey2: " + globalMd5Key);
+                const selfId = x2.add(0x40).readUtf8String();
+                console.log("[+] globalImageCdnKey: " + globalImageCdnKey + " globalAesKey1: " + globalAesKey1 +
+                    " globalAesKey2: " + globalMd5Key + " selfId: " + selfId);
+                send({
+                    type: "finish",
+                    self_id: selfId,
+                })
             } catch (e) {
                 console.log("[-] Memory access error at onEnter: " + e);
             }
@@ -892,7 +944,103 @@ setImmediate(patchCdnOnComplete)
 
 rpc.exports = {
     triggerSendImgMessage: triggerSendImgMessage,
-    triggerUploadImg: triggerUploadImg
+    triggerUploadImg: triggerUploadImg,
+    triggerSendTextMessage: triggerSendTextMessage
 };
 
 // -------------------------发送图片消息分区-------------------------
+
+// -------------------------接收消息分区-------------------------
+function setReceiver() {
+
+    // 3. 开始拦截
+    Interceptor.attach(buf2RespAddr, {
+        onEnter: function (args) {
+
+            const currentPtr = this.context.x1;
+            let start = 0x1e;
+            let senderLen = currentPtr.add(start).readU8();
+            if (senderLen !== 0x14 && senderLen !== 0x13) {
+                start = 0x1d;
+                let senderLen = currentPtr.add(start).readU8();
+                if (senderLen !== 0x14 && senderLen !== 0x13) {
+                    return
+                }
+            }
+
+            console.log("[+] Entered Receive Function: 0x1023B5348");
+
+            let senderPtr = currentPtr.add(start + 1);
+            let sender = senderPtr.readUtf8String(senderLen);
+
+            let receiverLenPtr = senderPtr.add(senderLen).add(3);
+            let receiverLen = receiverLenPtr.readU8();
+            let receiverStrPtr = receiverLenPtr.add(1);
+            let receiver = receiverStrPtr.readUtf8String(receiverLen);
+
+            let contentLenPtr = receiverStrPtr.add(receiverLen).add(6);
+            // 判断是否等于 0x77 ('w'), 如果是，则是短字段
+            if (isPrintableOrChinese(contentLenPtr, 1)) {
+                contentLenPtr = contentLenPtr.add(-1);
+            }
+            const contentLenValue = readVarint(contentLenPtr)
+            let contentPtr = contentLenPtr.add(contentLenValue.byteLength);
+            var content = contentPtr.readUtf8String(contentLenValue.value);
+
+            var selfId = receiver
+            var msgType = "private"
+            var groupId = ""
+            var senderUser = sender
+            var messages = [];
+            messages.push({type: "text", data: {text: content}});
+
+            if (sender.includes("@chatroom")) {
+                msgType = "group"
+                groupId = sender
+                let splitIndex = -1;
+                for (let i = 0; i < content.length; i++) {
+                    if (content[i] === ':') {
+                        splitIndex = i;
+                        break;
+                    }
+                }
+
+                senderUser = content.substring(0, splitIndex).trim();
+                content = content.substring(splitIndex + 2).trim();
+
+                messages = [];
+                const parts = content.split('\u2005');
+                for (let part of parts) {
+                    part = part.trim();
+                    if (!part.startsWith("@")) {
+                        messages.push({type: "text", data: {text: part}});
+                    }
+                }
+
+                const xmlPtr = contentPtr.add(contentLenValue.value).add(15);
+                const xmlLenValue = readVarint(xmlPtr)
+                const xml = xmlPtr.add(xmlLenValue.byteLength).readUtf8String(xmlLenValue.value);
+                const atUserMatch = xml.match(/<atuserlist>([\s\S]*?)<\/atuserlist>/);
+                const atUser = atUserMatch ? atUserMatch[1] : null;
+                if (atUser) {
+                    messages.push({type: "at", data: {qq: atUser}});
+                }
+            }
+
+            send({
+                message_type: msgType,
+                user_id: senderUser, // 发送人的 ID
+                self_id: selfId, // 接收人的 ID
+                group_id: groupId, // 群 ID
+                message_id: generateAESKey(),
+                type: "send",
+                raw: {peerUid: generateAESKey()},
+                message: messages
+            })
+        },
+    });
+}
+
+// 使用 setImmediate 确保在模块加载后执行
+setImmediate(setReceiver)
+// -------------------------接收消息分区-------------------------

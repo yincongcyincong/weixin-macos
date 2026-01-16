@@ -4,16 +4,21 @@ import (
 	"bytes"
 	"context"
 	"crypto/hmac"
+	"crypto/md5"
 	"crypto/sha1"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
 	"log"
+	"math/rand"
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
+	"strings"
 	"sync/atomic"
 	"syscall"
 	"text/template"
@@ -27,6 +32,7 @@ var (
 	fridaScript *frida.Script
 	session     *frida.Session
 	taskId      = int64(0x20000000)
+	myWechatId  = ""
 	
 	msgChan    = make(chan *SendMsg, 10)
 	finishChan = make(chan struct{})
@@ -34,10 +40,17 @@ var (
 	config = &Config{}
 )
 
+type WechatMessage struct {
+	GroupId string `json:"group_id"`
+	SelfID  string `json:"self_id"`
+	UserID  string `json:"user_id"`
+}
+
 type SendMsg struct {
 	UserId  string
 	GroupID string
 	Content string
+	Type    string
 }
 
 // SendRequest 请求结构体
@@ -55,6 +68,7 @@ type Message struct {
 type SendRequestData struct {
 	Id   string `json:"id"`
 	Text string `json:"text"`
+	File string `json:"file"`
 }
 
 type Config struct {
@@ -64,6 +78,7 @@ type Config struct {
 	FridaGadgetAddr string `json:"frida_gadget_addr"`
 	WechatPid       int    `json:"wechat_pid"`
 	OnebotToken     string `json:"onebot_token"`
+	ImagePath       string `json:"image_path"`
 	
 	WechatConf string `json:"wechat_conf"`
 }
@@ -75,7 +90,9 @@ func initFlag() {
 	flag.StringVar(&config.FridaGadgetAddr, "gadget_addr", "127.0.0.1:27042", "Gadget 地址: 127.0.0.1:27042 仅当 type 为 gadget 时有效")
 	flag.IntVar(&config.WechatPid, "wechat_pid", 0, "微信进程 ID: 58183, 仅当 type 为 local 时有效")
 	flag.StringVar(&config.OnebotToken, "token", "MuseBot", "OneBot Token: 123456")
-	flag.StringVar(&config.WechatConf, "wechat_conf", "../wechat_version/4_1_6_12_mac.json", "微信配置文件路径: ../wechat_version/4_1_6_12_mac.json")
+	flag.StringVar(&config.ImagePath, "image_path", "", "图片路径: /Users/xxx/Library/Containers/com.tencent.xinWeChat/Data/Documents/xwechat_files/xxx/temp/xxx/2026-01/Img/")
+	
+	//flag.StringVar(&config.WechatConf, "wechat_conf", "../wechat_version/4_1_6_12_mac.json", "微信配置文件路径: ../wechat_version/4_1_6_12_mac.json")
 	
 	flag.Parse()
 	
@@ -85,7 +102,8 @@ func initFlag() {
 	fmt.Println("FridaGadgetAddr", config.FridaGadgetAddr)
 	fmt.Println("WechatPid", config.WechatPid)
 	fmt.Println("OnebotToken", config.OnebotToken)
-	fmt.Println("WechatConf", config.WechatConf)
+	fmt.Println("ImagePath", config.ImagePath)
+	//fmt.Println("WechatConf", config.WechatConf)
 	
 }
 
@@ -126,16 +144,16 @@ func initFrida() {
 }
 
 func loadJs() {
-	jsonData, err := os.ReadFile(config.WechatConf)
-	if err != nil {
-		log.Fatalf("读取文件失败: %v\n", err)
-	}
+	//jsonData, err := os.ReadFile(config.WechatConf)
+	//if err != nil {
+	//	log.Fatalf("读取文件失败: %v\n", err)
+	//}
 	
 	// 2. 将 JSON 解析为 Map
 	var wechatHookConf map[string]interface{}
-	if err := json.Unmarshal(jsonData, &wechatHookConf); err != nil {
-		log.Fatalf("解析 JSON 失败: %v\n", err)
-	}
+	//if err := json.Unmarshal(jsonData, &wechatHookConf); err != nil {
+	//	log.Fatalf("解析 JSON 失败: %v\n", err)
+	//}
 	
 	codeTemplate, err := os.ReadFile("./script.js")
 	if err != nil {
@@ -174,6 +192,9 @@ func loadJs() {
 						if t.(string) == "send" {
 							go SendHttpReq(msg)
 						} else if t.(string) == "finish" {
+							if selfId, ok := pMap["self_id"]; ok {
+								myWechatId = selfId.(string)
+							}
 							finishChan <- struct{}{}
 						}
 					}
@@ -214,17 +235,22 @@ func sendHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	
-	text := ""
 	for _, v := range req.Message {
 		if v.Type == "text" {
-			text = v.Data.Text
+			msgChan <- &SendMsg{
+				UserId:  req.UserID,
+				GroupID: req.GroupID,
+				Content: v.Data.Text,
+				Type:    v.Type,
+			}
+		} else if v.Type == "image" {
+			msgChan <- &SendMsg{
+				UserId:  req.UserID,
+				GroupID: req.GroupID,
+				Content: v.Data.File,
+				Type:    v.Type,
+			}
 		}
-	}
-	
-	msgChan <- &SendMsg{
-		UserId:  req.UserID,
-		GroupID: req.GroupID,
-		Content: text,
 	}
 	
 	json.NewEncoder(w).Encode(map[string]any{
@@ -240,34 +266,61 @@ func SendWorker() {
 		}
 	}()
 	
-	for m := range msgChan {
-		currTaskId := atomic.AddInt64(&taskId, 1)
-		log.Printf("📩 收到任务: %d\n", currTaskId)
-		
-		// 1. 创建一个 1 秒超时的上下文
-		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
-		
-		// 必须在处理完后释放 context 资源
-		defer cancel()
-		
-		targetId := m.UserId
-		if m.GroupID != "" && targetId == "" {
-			targetId = m.GroupID
+	for {
+		select {
+		case <-finishChan:
+			fmt.Printf("收到完成信号 \n")
+		case m, ok := <-msgChan:
+			if !ok {
+				return
+			}
+			SendWechatMsg(m)
+		}
+	}
+}
+
+func SendWechatMsg(m *SendMsg) {
+	currTaskId := atomic.AddInt64(&taskId, 1)
+	log.Printf("📩 收到任务: %d\n", currTaskId)
+	
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	
+	targetId := m.UserId
+	if m.GroupID != "" && targetId == "" {
+		targetId = m.GroupID
+	}
+	
+	switch m.Type {
+	case "text":
+		result := fridaScript.ExportsCall("triggerSendTextMessage", currTaskId, targetId, m.Content)
+		log.Printf("📩 发送文本任务执行结果：%s\n", result)
+	case "image":
+		targetPath, md5Str, err := SaveBase64Image(m.Content)
+		if err != nil {
+			log.Printf("保存图片失败: %v\n", err)
+			return
 		}
 		
-		// 在子协程中执行阻塞的 Frida 调用
-		result := fridaScript.ExportsCall("manualTrigger", currTaskId, targetId, m.Content)
-		if result == nil {
-			log.Printf("📩 任务执行%s\n", result)
-		}
+		result := fridaScript.ExportsCall("triggerUploadImg", targetId, md5Str, targetPath)
+		log.Printf("📩 上传图片任务执行结果%s, 参数：targetId: %s, md5Str: %s, targetPath: %s\n", result, targetId, md5Str, targetPath)
 		
 		select {
 		case <-ctx.Done():
-			// 此时已经过了 1 秒，resChan 还没收到数据
-			log.Printf("任务 %d 执行超时！\n", currTaskId)
+			log.Printf("上传图片任务 %d 执行超时！\n", currTaskId)
 		case <-finishChan:
-			log.Printf("收到完成信号，任务 %d 完成\n", currTaskId)
+			log.Printf("收到上传图片完成信号，任务 %d 完成\n", currTaskId)
 		}
+		
+		result = fridaScript.ExportsCall("triggerSendImgMessage", currTaskId, myWechatId, targetId)
+		log.Printf("📩 发送图片任务执行%s, 参数：currTaskId: %d, myWechatId: %s, targetId: %s\n", result, currTaskId, myWechatId, targetId)
+	}
+	
+	select {
+	case <-ctx.Done():
+		log.Printf("任务 %d 执行超时！\n", currTaskId)
+	case <-finishChan:
+		log.Printf("收到完成信号，任务 %d 完成\n", currTaskId)
 	}
 }
 
@@ -315,6 +368,15 @@ func SendHttpReq(msg map[string]interface{}) {
 	}
 	
 	fmt.Printf("发送数据: %s\n", string(jsonData))
+	if myWechatId == "" {
+		m := new(WechatMessage)
+		err = json.Unmarshal(jsonData, m)
+		if err != nil {
+			log.Printf("解析消息失败: %v\n", err)
+			return
+		}
+		myWechatId = m.SelfID
+	}
 	
 	// 4. 创建 POST 请求
 	req, err := http.NewRequest("POST", config.SendURL, bytes.NewBuffer(jsonData))
@@ -348,4 +410,75 @@ func SendHttpReq(msg map[string]interface{}) {
 	}
 	
 	fmt.Printf("状态码: %d 返回内容: %s\n", resp.StatusCode, string(body))
+}
+
+func SaveBase64Image(base64Data string) (string, string, error) {
+	rawContents := base64Data
+	if strings.HasPrefix(base64Data, "base64://") {
+		rawContents = strings.TrimPrefix(base64Data, "base64://")
+	} else if idx := strings.Index(base64Data, ","); idx != -1 {
+		rawContents = base64Data[idx+1:]
+	}
+	
+	data, err := base64.StdEncoding.DecodeString(rawContents)
+	if err != nil {
+		return "", "", fmt.Errorf("base64 decode failed: %v", err)
+	}
+	
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	randomNumber := r.Intn(1000) // 生成 0-999 的随机数
+	timestamp := time.Now().Unix()
+	fileName := fmt.Sprintf("%d_%d.%s", randomNumber, timestamp, DetectImageFormat(data))
+	targetPath := config.ImagePath + fileName
+	dir := filepath.Dir(targetPath)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return "", "", fmt.Errorf("create directory failed: %v", err)
+	}
+	
+	err = os.WriteFile(targetPath, data, 0644)
+	if err != nil {
+		return "", "", fmt.Errorf("write file failed: %v", err)
+	}
+	
+	md5Str, err := GetFileMD5(targetPath)
+	if err != nil {
+		return "", "", fmt.Errorf("get file md5 failed: %v", err)
+	}
+	
+	return targetPath, md5Str, nil
+}
+
+func GetFileMD5(filePath string) (string, error) {
+	file, err := os.Open(filePath)
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
+	
+	hash := md5.New()
+	if _, err := io.Copy(hash, file); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(hash.Sum(nil)), nil
+}
+
+func DetectImageFormat(data []byte) string {
+	if len(data) < 12 {
+		return "unknown"
+	}
+	
+	switch {
+	case bytes.HasPrefix(data, []byte{0xFF, 0xD8, 0xFF}):
+		return "jpeg"
+	case bytes.HasPrefix(data, []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A}):
+		return "png"
+	case bytes.HasPrefix(data, []byte("GIF87a")) || bytes.HasPrefix(data, []byte("GIF89a")):
+		return "gif"
+	case bytes.HasPrefix(data, []byte{0x42, 0x4D}):
+		return "bmp"
+	case bytes.HasPrefix(data, []byte("RIFF")) && bytes.HasPrefix(data[8:], []byte("WEBP")):
+		return "webp"
+	default:
+		return "unknown"
+	}
 }

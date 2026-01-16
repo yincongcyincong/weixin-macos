@@ -1,4 +1,5 @@
 触发 STNManager__MMStartTask 
+图片hook: startUploadMedia, OnUploadCompleted
 Req2Buf 构造消息的buffer入口，其中X4是消息内容，输出的是压缩后的protobuf
 Pack是打包函数，消息内容 cgi等信息打包进入
 InitClientChannel， DoHandShakeLoop 是建立mmtls链接最重要的函数
