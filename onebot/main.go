@@ -32,7 +32,7 @@ var (
 	fridaScript *frida.Script
 	session     *frida.Session
 	taskId      = int64(0x20000000)
-	myWechatId  = "wxid_ldftuhe36izg19"
+	myWechatId  = ""
 	
 	msgChan    = make(chan *SendMsg, 10)
 	finishChan = make(chan struct{})
@@ -193,6 +193,11 @@ func loadJs() {
 							go SendHttpReq(msg)
 						} else if t.(string) == "finish" {
 							finishChan <- struct{}{}
+						} else if t.(string) == "upload" {
+							if selfId, ok := pMap["self_id"]; ok && myWechatId == "" {
+								fmt.Printf("✅ 检测到微信登录，当前账号: %s\n", selfId.(string))
+								myWechatId = selfId.(string)
+							}
 						}
 					}
 				}

@@ -780,7 +780,7 @@ function attachProto() {
 
             console.log("[+] 寄存器修改完成: X1=" + this.context.x1 + ", X2=" + this.context.x2, hexdump(imgProtoX1PayloadAddr, {
                 offset: 0,
-                length: 1024,
+                length: 256,
                 header: true,
                 ansi: true
             }));
@@ -908,7 +908,14 @@ function attachUploadMedia() {
         onEnter: function (args) {
             console.log("[+] enter UploadMedia");
             uploadGlobalX0 = this.context.x0;
-            console.log("UploadMedia x1: " + uploadGlobalX0);
+            const x1 = this.context.x1;
+            const selfId = x1.add(0x68).readUtf8String();
+            const imagePath = x1.add(0xe0).readPointer().readUtf8String();
+            send({
+                type: "upload",
+                self_id: selfId,
+            })
+            console.log("UploadMedia x1: " + uploadGlobalX0 + " imagePath: " + imagePath + " selfId: " + selfId);
         }
     })
 }
@@ -925,12 +932,10 @@ function patchCdnOnComplete() {
                 globalImageCdnKey = x2.add(0x60).readPointer().readUtf8String();
                 globalAesKey1 = x2.add(0x78).readPointer().readUtf8String();
                 globalMd5Key = x2.add(0x90).readPointer().readUtf8String();
-                const selfId = x2.add(0x40).readUtf8String();
                 console.log("[+] globalImageCdnKey: " + globalImageCdnKey + " globalAesKey1: " + globalAesKey1 +
-                    " globalAesKey2: " + globalMd5Key + " selfId: " + selfId);
+                    " globalAesKey2: " + globalMd5Key);
                 send({
                     type: "finish",
-                    self_id: selfId,
                 })
             } catch (e) {
                 console.log("[-] Memory access error at onEnter: " + e);
