@@ -42,3 +42,6 @@ manualTrigger(0x20000199, "wxid_xxx","wxid_xxx")
 
 ## 支持onebot协议 （http接口）
 https://github.com/yincongcyincong/weixin-macos/blob/main/onebot/readme.md    
+
+## 交流群
+https://t.me/+yBnP4fxkoCIzZjRl
