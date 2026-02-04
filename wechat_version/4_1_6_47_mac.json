@@ -13,5 +13,6 @@
   "patchImgProtobufFunc1": "0x2275BB8",
   "patchImgProtobufFunc2": "0x2275BD8",
   "imgProtobufDeleteAddr": "0x2275C14",
-  "CndOnCompleteAddr": "0x34154E0"
+  "CndOnCompleteAddr": "0x34154E0",
+  "uploadImageAddr": "0x45DC834"
 }

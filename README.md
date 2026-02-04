@@ -5,14 +5,14 @@
 怎么使用,如果你的mac已经关闭了SIP
 ```
 frida -f /Applications/WeChat.app/Contents/MacOS/WeChat -l frida/succ.js
-manualTrigger(0x20000095, "wxid_xxxx", "hi")
+triggerSendTextMessage(0x20000095, "wxid_xxxx", "hi")
 ```
 
 没有关闭SIP，查看文件 https://github.com/yincongcyincong/weixin-macos/blob/main/frida-gadget/readme.md    
 把每一步都执行完成，然后启动微信    
 ```
 frida -H 127.0.0.1:27042 -n Gadget -l ./frida/succ.js
-manualTrigger(0x20000095, "wxid_xxxx", "hi")
+triggerSendTextMessage(0x20000095, "wxid_xxxx", "hi")
 ```
 
 ![image](https://github.com/user-attachments/assets/401de4b8-5d10-48d9-8dcf-eecc8ae8682a)
@@ -35,8 +35,8 @@ mkdir -p "/Users/yincong/Library/Containers/com.tencent.xinWeChat/Data/Documents
 cp /Users/yincong/Desktop/1.png /Users/yincong/Library/Containers/com.tencent.xinWeChat/Data/Documents/xwechat_files/wxid_xxx/temp/xxx/2026-01/Img/xxx.jpg
 
 
-manualUpload("wxid_7wd1ece99f7i21", "8dd4755e12e052fa5647a883e6bf0783", "/Users/yincong/Library/Containers/com.tencent.xinWeChat/Data/Documents/xwechat_files/wxid_xxx/temp/xxx/2026-01/Img/xxx.jpg")
-manualTrigger(0x20000199, "wxid_xxx","wxid_xxx")
+triggerUploadImg("wxid_7wd1ece99f7i21", "8dd4755e12e052fa5647a883e6bf0783", "/Users/yincong/Library/Containers/com.tencent.xinWeChat/Data/Documents/xwechat_files/wxid_xxx/temp/xxx/2026-01/Img/xxx.jpg")
+triggerSendImgMessage(0x20000199, "wxid_xxx","wxid_xxx")
 
 ```
 

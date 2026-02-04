@@ -1,0 +1,17 @@
+{
+  "protobufAddr": "0x32FB280",
+  "patchTextProtobufAddr": "0x32FB25C",
+  "PatchTextProtobufDeleteAddr": "0x32FB298",
+  "triggerX1Payload": "0x174E4A600",
+  "sendFuncAddr": "0x55F7540",
+  "req2bufEnterAddr": "0x4542DBC",
+  "req2bufExitAddr": "0x4543F78",
+  "imgProtobufAddr": "0x3317834",
+  "patchImgProtobufFunc1": "0x33177F0",
+  "patchImgProtobufFunc2": "0x3317810 ",
+  "imgProtobufDeleteAddr": "0x331784C",
+  "uploadImageAddr": "0x45DC834",
+  "CndOnCompleteAddr": "0x450195C",
+
+  "buf2RespAddr": "0x35F4B58"
+}

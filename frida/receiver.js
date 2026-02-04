@@ -2,16 +2,16 @@ var baseAddr = Process.getModuleByName("WeChat").base;
 if (!baseAddr) {
     console.error("[!] 找不到 WeChat 模块基址，请检查进程名。");
 }
-console.log("[+] WeChat base address: " + baseAddr);
 
+var buf2RespAddr = baseAddr.add(0x35F4B58)
+
+// -------------------------接收消息分区-------------------------
 function setReceiver() {
-    var buf2RespAddr = baseAddr.add(0x347BD44);
-    console.log("[+] buf2RespAddr WeChat Base: " + baseAddr + "[+] Attaching to: " + buf2RespAddr);
 
     // 3. 开始拦截
     Interceptor.attach(buf2RespAddr, {
         onEnter: function (args) {
-
+            console.log("[*] 拦截到消息发送");
             const currentPtr = this.context.x1;
             let start = 0x1e;
             let senderLen = currentPtr.add(start).readU8();
@@ -112,15 +112,6 @@ function setReceiver() {
 
 // 使用 setImmediate 确保在模块加载后执行
 setImmediate(setReceiver)
-
-function generateAESKey() {
-    const chars = 'abcdef0123456789';
-    let key = '';
-    for (let i = 0; i < 32; i++) {
-        key += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return key;
-}
 
 
 function getProtobufRawBytes(pBuffer, scanSize) {
@@ -235,4 +226,13 @@ function getCleanString(uint8Array) {
         }
     }
     return out;
+}
+
+function generateAESKey() {
+    const chars = 'abcdef0123456789';
+    let key = '';
+    for (let i = 0; i < 32; i++) {
+        key += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return key;
 }

@@ -220,7 +220,7 @@ var sendTextMessageAddr = ptr(0);
 var textMessageAddr = ptr(0);
 var textProtoX1PayloadAddr = ptr(0);
 var sendMessageCallbackFunc = ptr(0);
-var messageCallbackFunc1 = baseAddr.add({{.messageCallbackFunc1}});
+var messageCallbackFunc1 = ptr(0);
 
 
 // 双方公共使用的地址
@@ -233,8 +233,8 @@ var sendMsgType = "";
 var buf2RespAddr = baseAddr.add({{.buf2RespAddr}});
 
 // 图片消息全局变量
-var sendImgMessageCallbackFunc = ptr(0x0);
-var imgMessageCallbackFunc1 = baseAddr.add({{.imgMessageCallbackFunc1}});
+var sendImgMessageCallbackFunc = ptr(0);
+var uploadImageAddr = baseAddr.add({{.uploadImageAddr}});
 var imgProtobufAddr = baseAddr.add({{.imgProtobufAddr}});
 var patchImgProtobufFunc1 = baseAddr.add({{.patchImgProtobufFunc1}})
 var patchImgProtobufFunc2 = baseAddr.add({{.patchImgProtobufFunc2}});
@@ -433,7 +433,7 @@ function triggerSendTextMessage(taskId, receiver, content, atUser) {
         console.log(`[+] Execution MMStartTask ${sendFuncAddr} with args: (${arg2})  Success. Return value: ` + result);
         return "ok";
     } catch (e) {
-        console.error("[!] Error trigger function  during execution: " + e);
+        console.error(`[!] Error trigger  MMStartTask ${sendFuncAddr}  during execution: ` + e);
         return "fail";
     }
 }
@@ -609,7 +609,7 @@ function setupSendImgMessageDynamic() {
     }));
 
     // C. 构建 Message 结构体
-    imgMessageAddr.add(0x00).writePointer(imgMessageCallbackFunc1);
+    imgMessageAddr.add(0x00).writePointer();
     imgMessageAddr.add(0x08).writeU32(taskIdGlobal);
     imgMessageAddr.add(0x0c).writeU32(0x6e);
     imgMessageAddr.add(0x10).writeU64(0x3);
@@ -963,9 +963,7 @@ function triggerUploadImg(receiver, md5, imagePath) {
     uploadImagePayload.add(0x140).writePointer(ImagePathAddr1);
     uploadImagePayload.add(0x1f8).writePointer(uploadAesKeyAddr);
 
-
-    const targetAddr = baseAddr.add(0x45DC834);
-    const startUploadMedia = new NativeFunction(targetAddr, 'int64', ['pointer', 'pointer']);
+    const startUploadMedia = new NativeFunction(uploadImageAddr, 'int64', ['pointer', 'pointer']);
 
     console.log("开始手动触发 C2C 上传...");
     const result = startUploadMedia(uploadGlobalX0, uploadImagePayload);
@@ -973,8 +971,7 @@ function triggerUploadImg(receiver, md5, imagePath) {
 }
 
 function attachUploadMedia() {
-    const targetAddr = baseAddr.add(0x45DC85C);
-    Interceptor.attach(targetAddr, {
+    Interceptor.attach(uploadImageAddr, {
         onEnter: function (args) {
             console.log("[+] enter UploadMedia");
             uploadGlobalX0 = this.context.x0;

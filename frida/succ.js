@@ -82,61 +82,8 @@ function generateAESKey() {
     return key;
 }
 
-
-function readVarint(addr) {
-    let value = 0;
-    let shift = 0;
-    let count = 0;
-
-    while (true) {
-        let byte = addr.add(count).readU8();
-        // 取低7位进行累加
-        value |= (byte & 0x7f) << shift;
-        count++; // 消耗了一个字节
-
-        // 如果最高位是0，跳出循环
-        if ((byte & 0x80) === 0) break;
-
-        shift += 7;
-        if (count > 5) return -1; // 安全校验，防止死循环
-    }
-
-    return {
-        value: value,      // 最终长度数值 (例如 251)
-        byteLength: count  // 长度字段占用的字节数 (例如 2)
-    };
-}
-
-function isPrintableOrChinese(startPtr, maxScanLength) {
-    let offset = 0;
-    while (offset < maxScanLength) {
-        let b = startPtr.add(offset).readU8();
-
-        if (b === 0) {
-            // 扫描到 \0，且之前没有发现异常字节
-            return offset > 0; // 如果第一个就是 \0，视为非字符串（可能是空指针）
-        }
-
-        // 判定逻辑：
-        // 1. 可见 ASCII (32-126) 或 换行/制表符 (9, 10, 13)
-        let isAscii = (b >= 32 && b <= 126) || (b === 9 || b === 10 || b === 13);
-
-        // 2. 汉字 UTF-8 特征：第一个字节通常 >= 0x80 (128)
-        // 严谨点：UTF-8 汉字首字节通常在 0xE4-0xE9 之间，后续字节在 0x80-0xBF 之间
-        // 这里简化处理：如果是高位字符，我们暂时放行，由 readUtf8String 最终处理
-        let isHighBit = (b >= 0x80);
-
-        if (!isAscii && !isHighBit) {
-            // 发现既不是 ASCII 也不是高位字节（如 0x01-0x1F 的控制字符），判定为指针
-            return false;
-        }
-        offset++;
-    }
-    return true;
-}
-
 function getProtobufRawBytes(pBuffer, scanSize) {
-    const tags = [0x12, 0x1A, 0x2A, 0x52];
+    const tags = [0x12, 0x1A, 0x2A, 0x52, 0x5A];
     let uint8Array;
 
     try {
@@ -229,8 +176,7 @@ function getCleanString(uint8Array) {
                     out += String.fromCharCode(charCode);
                 }
             }
-        }
-        else if ((c & 0xF8) === 0xF0 && i + 2 < len) {
+        } else if ((c & 0xF8) === 0xF0 && i + 2 < len) {
             var c2 = uint8Array[i++];
             var c3 = uint8Array[i++];
             var c4 = uint8Array[i++];
@@ -249,39 +195,51 @@ function getCleanString(uint8Array) {
     return out;
 }
 
+function generateBytes(n) {
+    // 生成随机字符串
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    let result = '';
+
+    for (let i = 0; i < n; i++) {
+        result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+
+    return stringToHexArray(result);
+}
+
 // -------------------------基础函数分区-------------------------
 
 // -------------------------全局变量分区-------------------------
 
 // 文本消息全局变量
-var protobufAddr = baseAddr.add(0x227EC70);
-var patchTextProtobufAddr = baseAddr.add(0x227EC4C);
-var PatchTextProtobufDeleteAddr = baseAddr.add(0x227EC88);
+var protobufAddr = baseAddr.add(0x66E7280);
+var patchTextProtobufAddr = baseAddr.add(0x66E725C);
+var PatchTextProtobufDeleteAddr = baseAddr.add(0x66E7298);
 var textCgiAddr = ptr(0);
 var sendTextMessageAddr = ptr(0);
 var textMessageAddr = ptr(0);
 var textProtoX1PayloadAddr = ptr(0);
 var sendMessageCallbackFunc = ptr(0);
-var messageCallbackFunc1 = baseAddr.add(0x7fa1050);
+var messageCallbackFunc1 = ptr(0);
 
 
 // 双方公共使用的地址
-var triggerX1Payload = ptr(0x175ED6600);
-var req2bufEnterAddr = baseAddr.add(0x34566C0);
-var req2bufExitAddr = baseAddr.add(0x34577D8);
-var sendFuncAddr = baseAddr.add(0x448A858);
+var triggerX1Payload = ptr(0x173a5a600);
+var req2bufEnterAddr = baseAddr.add(0x792EDC0);
+var req2bufExitAddr = baseAddr.add(0x792FF78);
+var sendFuncAddr = baseAddr.add(0x89E3540);
 var insertMsgAddr = ptr(0);
 var sendMsgType = "";
-var buf2RespAddr = baseAddr.add(0x347BD44);
+var buf2RespAddr = baseAddr.add(0x4568B58);
 
 // 图片消息全局变量
-var sendImgMessageCallbackFunc = ptr(0x0);
-var imgMessageCallbackFunc1 = baseAddr.add(0x7fa0b18);
-var imgProtobufAddr = baseAddr.add(0x2275BFC);
-var patchImgProtobufFunc1 = baseAddr.add(0x2275BB8)
-var patchImgProtobufFunc2 = baseAddr.add(0x2275BD8);
-var imgProtobufDeleteAddr = baseAddr.add(0x2275C14);
-var CndOnCompleteAddr = baseAddr.add(0x34154E0);
+var sendImgMessageCallbackFunc = ptr(0);
+var uploadImageAddr = baseAddr.add(0x45DC834);
+var imgProtobufAddr = baseAddr.add(0x3317834);
+var patchImgProtobufFunc1 = baseAddr.add(0x0)
+var patchImgProtobufFunc2 = baseAddr.add(0x0);
+var imgProtobufDeleteAddr = baseAddr.add(0x0);
+var CndOnCompleteAddr = baseAddr.add(0x450195C);
 
 var imgCgiAddr = ptr(0);
 var sendImgMessageAddr = ptr(0);
@@ -306,6 +264,9 @@ var receiverGlobal = "wxid_"
 var contentGlobal = "";
 var senderGlobal = "wxid_"
 var lastSendTime = 0;
+var atUserGlobal = "";
+
+const imageCp = generateBytes(16) // m30c4674f5a0b9d
 
 // -------------------------全局变量分区-------------------------
 
@@ -383,7 +344,7 @@ setTimeout(function () {
     patchTextProtoBuf();
 }, 3000);
 
-function triggerSendTextMessage(taskId, receiver, content) {
+function triggerSendTextMessage(taskId, receiver, content, atUser) {
     console.log("[+] Manual Trigger Started...");
     if (!taskId || !receiver || !content) {
         console.error("[!] taskId or Receiver or Content is empty!");
@@ -396,11 +357,11 @@ function triggerSendTextMessage(taskId, receiver, content) {
     taskIdGlobal = taskId;
     receiverGlobal = receiver;
     contentGlobal = content;
+    atUserGlobal = atUser
+    console.log("taskIdGlobal: " + taskIdGlobal + ", receiverGlobal: " + receiverGlobal + ", contentGlobal: " + contentGlobal + ", atUserGlobal: " + atUserGlobal) ;
 
     textMessageAddr.add(0x08).writeU32(taskIdGlobal);
     sendTextMessageAddr.add(0x20).writeU32(taskIdGlobal);
-
-    console.log("start init payload")
 
     const payloadData = [
         0x0A, 0x02, 0x00, 0x00,                         // 0x00
@@ -468,12 +429,11 @@ function triggerSendTextMessage(taskId, receiver, content) {
     try {
         // const arg1 = globalMessagePtr; // 第一个指针参数
         const arg2 = triggerX1Payload; // 第二个参数 0x175ED6600
-        console.log(`[+] Calling MMStartTask  at ${sendFuncAddr} with args: (${arg2})`);
         const result = MMStartTask(arg2);
-        console.log("[+] Execution MMStartTask  Success. Return value: " + result);
+        console.log(`[+] Execution MMStartTask ${sendFuncAddr} with args: (${arg2})  Success. Return value: ` + result);
         return "ok";
     } catch (e) {
-        console.error("[!] Error trigger function  during execution: " + e);
+        console.error(`[!] Error trigger  MMStartTask ${sendFuncAddr}  during execution: ` + e);
         return "fail";
     }
 }
@@ -494,7 +454,7 @@ function attachSendTextProto() {
                 console.log("[+] Protobuf 拦截未命中，跳过...");
                 return;
             }
-            console.log("[+] 正在注入 Protobuf Payload...");
+            console.log(`[+] 正在注入 Protobuf Payload content: ${contentGlobal}, receiver: ${receiverGlobal}, atUser: ${atUserGlobal}`);
 
             const type = [0x08, 0x01, 0x12]
             const receiverHeader = [0x0A, receiverGlobal.length + 2, 0x0A, receiverGlobal.length];
@@ -506,27 +466,32 @@ function attachSendTextProto() {
             const msgIdHeader = [0x28]
             const msgId = generateRandom5ByteVarint()
 
-            const suffix = [
-                0x32, 0x32, 0x3C,                               // 0x28 头部
-                0x6D, 0x73, 0x67, 0x73, 0x6F, 0x75, 0x72, // 0x30 msgsour
-                0x63, 0x65, 0x3E, 0x3C, 0x61, 0x6C, 0x6E, 0x6F, // 0x38 ce><alno
-                0x64, 0x65, 0x3E, 0x3C, 0x66, 0x72, 0x3E, 0x31, // 0x40 de><fr>1
-                0x3C, 0x2F, 0x66, 0x72, 0x3E, 0x3C, 0x2F, 0x61, // 0x48 </fr></a
-                0x6C, 0x6E, 0x6F, 0x64, 0x65, 0x3E, 0x3C, 0x2F, // 0x50 lnode></
-                0x6D, 0x73, 0x67, 0x73, 0x6F, 0x75, 0x72, // 0x58 msgsour
-                0x63, 0x65, 0x3E, 0x00                          // 0x60 ce>.
-            ];
+            const htmlUpperPart = [0x3C, 0x6D, 0x73, 0x67, 0x73, 0x6F, 0x75, 0x72, 0x63, 0x65, 0x3E]
+            let atUserHeader = []
+            if (atUserGlobal) {
+                atUserHeader = atUserHeader.concat([0x3C, 0x61, 0x74, 0x75, 0x73, 0x65, 0x72, 0x6c, 0x69, 0x73, 0x74, 0x3e]).
+                concat(stringToHexArray(atUserGlobal)).concat([0x3C, 0x2F, 0x61, 0x74, 0x75, 0x73, 0x65, 0x72, 0x6C, 0x69, 0x73, 0x74, 0x3E])
+            }
+            const htmlLowerPart = [0x3C, 0x61, 0x6C, 0x6E, 0x6F,
+                0x64, 0x65, 0x3E, 0x3C, 0x66, 0x72, 0x3E, 0x31,
+                0x3C, 0x2F, 0x66, 0x72, 0x3E, 0x3C, 0x2F, 0x61,
+                0x6C, 0x6E, 0x6F, 0x64, 0x65, 0x3E, 0x3C, 0x2F,
+                0x6D, 0x73, 0x67, 0x73, 0x6F, 0x75, 0x72,
+                0x63, 0x65, 0x3E, 0x00]
+
+            const htmlHeader = [0x32, htmlUpperPart.length + atUserHeader.length + htmlLowerPart.length]
+
 
             const valueLen = toVarint(receiverHeader.length + receiverProto.length + contentHeader.length +
-                contentProto.length + tsHeader.length + tsBytes.length + msgIdHeader.length + msgId.length + suffix.length)
+                contentProto.length + tsHeader.length + tsBytes.length + msgIdHeader.length + msgId.length + htmlHeader.length +
+                htmlUpperPart.length + atUserHeader.length + htmlLowerPart.length)
 
             // 合并数组
-            const finalPayload = type.concat(valueLen).concat(receiverHeader).concat(receiverProto).concat(contentHeader).concat(contentProto).concat(tsHeader).concat(tsBytes).concat(msgIdHeader).concat(msgId).concat(suffix);
+            const finalPayload = type.concat(valueLen).concat(receiverHeader).concat(receiverProto).concat(contentHeader).
+            concat(contentProto).concat(tsHeader).concat(tsBytes).concat(msgIdHeader).concat(msgId).concat(htmlHeader).concat(htmlUpperPart).
+            concat(atUserHeader).concat(htmlLowerPart);
 
-            console.log("[+] Payload 准备写入");
             textProtoX1PayloadAddr.writeByteArray(finalPayload);
-            console.log("[+] Payload 已写入，长度: " + finalPayload.length);
-
             this.context.x1 = textProtoX1PayloadAddr;
             this.context.x2 = ptr(finalPayload.length);
 
@@ -594,6 +559,7 @@ function attachReq2buf() {
             receiverGlobal = "";
             senderGlobal = "";
             contentGlobal = "";
+            atUserGlobal = "";
             send({
                 type: "finish",
             })
@@ -643,7 +609,7 @@ function setupSendImgMessageDynamic() {
     }));
 
     // C. 构建 Message 结构体
-    imgMessageAddr.add(0x00).writePointer(imgMessageCallbackFunc1);
+    imgMessageAddr.add(0x00).writeU64(0x0);
     imgMessageAddr.add(0x08).writeU32(taskIdGlobal);
     imgMessageAddr.add(0x0c).writeU32(0x6e);
     imgMessageAddr.add(0x10).writeU64(0x3);
@@ -799,24 +765,14 @@ function attachProto() {
         onEnter: function (args) {
             console.log("[+] Protobuf 拦截命中");
 
-            // var sp = this.context.sp;
-            // var firstValue = sp.readU32();
-            // if (firstValue !== taskIdGlobal) {
-            //     console.log("[+] Protobuf 拦截未命中，跳过...");
-            //     return;
-            // }
-
             const type = [0x0A, 0x40, 0x0A, 0x01, 0x00]
-            const msgId = [0x10, 0xc6, 0xbc, 0x90, 0xb9, 0x08] // 时间戳
+            const msgId = [0x10].concat(generateRandom5ByteVarint())
             const cpHeader = [0x1A, 0x10]
-            // m30c4674f5a0b9d
-            const cp = [0x6D, 0x33, 0x30, 0x63, 0x34, 0x36, 0x37, 0x34, 0x66, 0x35, 0x61, 0x30, 0x62, 0x39, 0x64, 0x30]
 
             const randomId = [0x20, 0xAF, 0xAC, 0x90, 0x93, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x01]
             const sysHeader = [0x2A, 0x15]
             // UnifiedPCMac 26 arm64
             const sys = [0x55, 0x6E, 0x69, 0x66, 0x69, 0x65, 0x64, 0x50, 0x43, 0x4D, 0x61, 0x63, 0x20, 0x32, 0x36, 0x20, 0x61, 0x72, 0x6D, 0x36, 0x34, 0x30]
-
 
             // 45872025384@chatroom_176787000_60_xwechat_1 只需要改这个时间戳就能重复发送
             const receiverMsgId = stringToHexArray(receiverGlobal).concat([0x5F])
@@ -880,7 +836,7 @@ function attachProto() {
                 0xC8, 0x02, 0x00, 0x00 // 0x3E8
             ]
 
-            const finalPayload = type.concat(msgId, cpHeader, cp, randomId, sysHeader, sys, msgIdHeader, receiverMsgId,
+            const finalPayload = type.concat(msgId, cpHeader, imageCp, randomId, sysHeader, sys, msgIdHeader, receiverMsgId,
                 senderHeader, sender, receiverHeader, receiver, randomId1, type1, randomId2, randomId3, randomId4, htmlHeader, html,
                 cdnHeader, cdn, cdn2Header, cdn2, aesKeyHeader, aesKey, randomId5, cdn3Header, cdn3, randomId6, randomId7, randomId8,
                 aesKey1Header, aesKey1, md5Header, me5Key, randomId9, left0)
@@ -1007,9 +963,7 @@ function triggerUploadImg(receiver, md5, imagePath) {
     uploadImagePayload.add(0x140).writePointer(ImagePathAddr1);
     uploadImagePayload.add(0x1f8).writePointer(uploadAesKeyAddr);
 
-
-    const targetAddr = baseAddr.add(0x45DC834);
-    const startUploadMedia = new NativeFunction(targetAddr, 'int64', ['pointer', 'pointer']);
+    const startUploadMedia = new NativeFunction(uploadImageAddr, 'int64', ['pointer', 'pointer']);
 
     console.log("开始手动触发 C2C 上传...");
     const result = startUploadMedia(uploadGlobalX0, uploadImagePayload);
@@ -1017,8 +971,7 @@ function triggerUploadImg(receiver, md5, imagePath) {
 }
 
 function attachUploadMedia() {
-    const targetAddr = baseAddr.add(0x45DC85C);
-    Interceptor.attach(targetAddr, {
+    Interceptor.attach(uploadImageAddr, {
         onEnter: function (args) {
             console.log("[+] enter UploadMedia");
             uploadGlobalX0 = this.context.x0;
@@ -1103,10 +1056,11 @@ function setReceiver() {
             const receiver = fields[1]
             const content = fields[2]
             const xml = fields[3]
+            const userContent = fields[4]
 
             if (sender === "" || receiver === "" || content === "" || xml === "") {
                 console.log("字段缺失，无法解析 sender:" + sender + " receiver:" + receiver + hexdump(currentPtr, {
-                    length: 128,
+                    length: x2,
                     header: true,
                     ansi: true,
                 }))
@@ -1118,35 +1072,26 @@ function setReceiver() {
             var groupId = ""
             var senderUser = sender
             var messages = [];
-            messages.push({type: "text", data: {text: content}});
+            var senderNickname = ""
+
+            let splitIndex = content.indexOf(':')
+            let pureContent = content.substring(splitIndex + 1).trim();
 
             if (sender.includes("@chatroom")) {
                 msgType = "group"
                 groupId = sender
-                let splitIndex = -1;
-                for (let i = 0; i < content.length; i++) {
-                    if (content[i] === ':') {
-                        splitIndex = i;
-                        break;
+
+                senderUser = content.substring(0, splitIndex).trim();
+                const parts = pureContent.split('\u2005');
+                for (let part of parts) {
+                    part = part.trim();
+                    if (!part.startsWith("@")) {
+                        messages.push({type: "text", data: {text: part}});
                     }
                 }
 
                 const sendUserStart = content.indexOf('wxid_')
                 senderUser = content.substring(sendUserStart, splitIndex).trim();
-
-                messages = [];
-                const parts = content.split('\u2005');
-                for (let part of parts) {
-                    part = part.trim();
-                    if (!part.startsWith("@")) {
-                        if (part.indexOf(":") !== -1) {
-                            messages.push({type: "text", data: {text: part.substring(part.indexOf(':') + 1)}});
-                        } else {
-                            messages.push({type: "text", data: {text: part}});
-                        }
-
-                    }
-                }
 
                 const atUserMatch = xml.match(/<atuserlist>([\s\S]*?)<\/atuserlist>/);
                 const atUser = atUserMatch ? atUserMatch[1] : null;
@@ -1158,6 +1103,21 @@ function setReceiver() {
                         }
                     });
                 }
+
+                // 处理用户的名称
+                splitIndex = userContent.indexOf(':')
+                if (splitIndex === -1) {
+                    splitIndex = userContent.indexOf('在群聊中@了你')
+                    senderNickname = userContent.substring(0, splitIndex).trim();
+                } else {
+                    senderNickname = userContent.substring(0, splitIndex).trim();
+                }
+
+            } else {
+                // 处理用户的名称
+                const splitIndex = userContent.indexOf(':')
+                senderNickname = userContent.substring(0, splitIndex).trim();
+                messages.push({type: "text", data: {text: pureContent}});
             }
 
             const msgId = generateAESKey()
@@ -1169,7 +1129,8 @@ function setReceiver() {
                 message_id: msgId,
                 type: "send",
                 raw: {peerUid: msgId},
-                message: messages
+                message: messages,
+                sender: {user_id: senderUser, nickname: senderNickname},
             })
         },
     });
