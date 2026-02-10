@@ -234,28 +234,31 @@ var sendMsgType = "";
 var buf2RespAddr = baseAddr.add({{.buf2RespAddr}});
 
 // 图片消息全局变量
-var sendImgMessageCallbackFunc = baseAddr.add({{.sendImgMessageCallbackFunc}});
 var uploadImageAddr = baseAddr.add({{.uploadImageAddr}});
 var imgProtobufAddr = baseAddr.add({{.imgProtobufAddr}});
 var patchImgProtobufFunc1 = baseAddr.add({{.patchImgProtobufFunc1}})
 var patchImgProtobufFunc2 = baseAddr.add({{.patchImgProtobufFunc2}});
 var imgProtobufDeleteAddr = baseAddr.add({{.imgProtobufDeleteAddr}});
 var CndOnCompleteAddr = baseAddr.add({{.CndOnCompleteAddr}});
+var imgMessageCallbackFunc1 = baseAddr.add({{.imgMessageCallbackFunc1}});
+var uploadGetCallbackWrapperAddr = baseAddr.add({{.uploadGetCallbackWrapperAddr}});
+var uploadGetCallbackWrapperFuncAddr = baseAddr.add({{.uploadGetCallbackWrapperFuncAddr}});
+var uploadOnCompleteAddr = baseAddr.add({{.uploadOnCompleteAddr}});
+var uploadOnCompleteFuncAddr = baseAddr.add({{.uploadOnCompleteFuncAddr}});
 
+var uploadImageX1;
 var imgCgiAddr = ptr(0);
 var sendImgMessageAddr = ptr(0);
 var imgMessageAddr = ptr(0);
 var imgProtoX1PayloadAddr = ptr(0);
 var uploadGlobalX0 = ptr(0)
 var uploadFunc1Addr = ptr(0)
-var uploadFunc1 = baseAddr.add({{.uploadFunc1}});
 var uploadFunc2Addr = ptr(0)
-var uploadFunc2 = baseAddr.add({{.uploadFunc2}});
 var imageIdAddr = ptr(0)
 var md5Addr = ptr(0)
 var uploadAesKeyAddr = ptr(0)
 var ImagePathAddr1 = ptr(0)
-var uploadImagePayload = ptr(0);
+var uploadCallback = ptr(0)
 
 var globalImageCdnKey = "";
 var globalAesKey1 = "";
@@ -598,11 +601,11 @@ function setupSendImgMessageDynamic() {
     imgMessageAddr = Memory.alloc(256);
     uploadFunc1Addr = Memory.alloc(24);
     uploadFunc2Addr = Memory.alloc(24);
+    uploadCallback = Memory.alloc(128);
     imageIdAddr = Memory.alloc(256);
     md5Addr = Memory.alloc(256);
     uploadAesKeyAddr = Memory.alloc(256);
     ImagePathAddr1 = Memory.alloc(256);
-    uploadImagePayload = Memory.alloc(1024);
 
     // A. 写入字符串内容
     patchString(imgCgiAddr, "/cgi-bin/micromsg-bin/uploadmsgimg");
@@ -623,7 +626,7 @@ function setupSendImgMessageDynamic() {
     }));
 
     // C. 构建 Message 结构体
-    imgMessageAddr.add(0x00).writePointer(sendImgMessageCallbackFunc);
+    imgMessageAddr.add(0x00).writePointer(imgMessageCallbackFunc1);
     imgMessageAddr.add(0x08).writeU32(taskIdGlobal);
     imgMessageAddr.add(0x0c).writeU32(0x6e);
     imgMessageAddr.add(0x10).writeU64(0x3);
@@ -633,10 +636,6 @@ function setupSendImgMessageDynamic() {
     imgMessageAddr.add(0x30).writeU64(uint64("0x0000000001010100"));
 
     console.log(" [+] Dynamic Memory Setup Complete. - Message Object: " + imgMessageAddr);
-
-
-    uploadFunc1Addr.writePointer(uploadFunc1);
-    uploadFunc2Addr.writePointer(uploadFunc2);
 }
 
 setImmediate(setupSendImgMessageDynamic);
@@ -717,7 +716,7 @@ function triggerSendImgMessage(taskId, sender, receiver) {
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // 0xA0
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // 0xA8
         0x00, 0x00, 0x00, 0x00, 0xAA, 0xAA, 0xAA, 0xAA, // 0xB0
-        0xC0, 0x66, 0xED, 0x75, 0x01, 0x00, 0x00, 0x00, // 0xB8
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // 0xB8
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // 0xC0
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // 0xC8
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // 0xD0
@@ -744,25 +743,26 @@ function triggerSendImgMessage(taskId, sender, receiver) {
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // 0x178
         0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // 0x180
         0x00, 0x00, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, // 0x188
-        0x98, 0x67, 0xED, 0x75, 0x01, 0x00, 0x00, 0x00, // 0x190
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // 0x190
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // 0x198
     ];
     triggerX1Payload.writeU32(taskIdGlobal);
     triggerX1Payload.add(0x04).writeByteArray(payloadData);
     triggerX1Payload.add(0x18).writePointer(imgCgiAddr);
+    triggerX1Payload.add(0xb8).writePointer(triggerX1Payload.add(0xc0));
+    triggerX1Payload.add(0x190).writePointer(triggerX1Payload.add(0x198));
     sendMsgType = "img"
 
-    const MMStartTask = new NativeFunction(sendFuncAddr, 'int64', ['pointer']);
+    console.log("finished init payload")
+    const MMStartTask = new NativeFunction(sendFuncAddr, 'int64', ['pointer', 'pointer']);
 
     // 5. 调用函数
     try {
-        const arg2 = triggerX1Payload; // 第二个参数 0x175ED6600
-        console.log(`[+] Calling MMStartTask  at ${sendFuncAddr} with args: (${arg2})`);
-        const result = MMStartTask(arg2);
-        console.log("[+] Execution MMStartTask  Success. Return value: " + result);
+        const result = MMStartTask(triggerX0, triggerX1Payload);
+        console.log(`[+] Execution StartTask ${sendFuncAddr} with args: (${triggerX0}) (${triggerX1Payload})  Success. Return value: ` + result);
         return "ok";
     } catch (e) {
-        console.error("[!] Error trigger function  during execution: " + e);
+        console.error(`[!] Error trigger StartTask ${sendFuncAddr} with args: (${triggerX0}) (${triggerX1Payload}),   during execution: ` + e);
         return "fail";
     }
 }
@@ -776,7 +776,6 @@ function attachProto() {
 
     Interceptor.attach(imgProtobufAddr, {
         onEnter: function (args) {
-
             const type = [0x0A, 0x40, 0x0A, 0x01, 0x00]
             const msgId = [0x10].concat(generateRandom5ByteVarint())
             const cpHeader = [0x1A, 0x10]
@@ -895,7 +894,7 @@ function triggerUploadImg(receiver, md5, imagePath) {
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         0x01, 0xAA, 0xAA, 0xAA, 0x01, 0x00, 0x00, 0x00, // 0x98
         0x00, 0x00, 0x00, 0x00, 0xAA, 0xAA, 0xAA, 0xAA, // 0xa0
-        0xA0, 0xBE, 0x2D, 0x8C, 0x0B, 0x00, 0x00, 0x00, // 某个aesid 7ea41d569f705357780968e9104284cf 0xa8
+        0xA0, 0xBE, 0x2D, 0x8C, 0x0B, 0x00, 0x00, 0x00, // 0xa8
         0x20, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // 0xb0
         0x28, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x80, // 0xb8
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -933,7 +932,7 @@ function triggerUploadImg(receiver, md5, imagePath) {
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // 0x1c0
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // 0x1c8
         0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // 0x1d0
-        0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // 0x1d8 有个指针
+        0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // 0x1d8
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // 0x1e0
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // 0x1e8
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // 0x1f0
@@ -963,37 +962,36 @@ function triggerUploadImg(receiver, md5, imagePath) {
     patchString(uploadAesKeyAddr, generateAESKey())
     patchString(ImagePathAddr1, imagePath);
 
-    uploadImagePayload.writeByteArray(payload);
-    uploadImagePayload.writePointer(uploadFunc1Addr);
-    uploadImagePayload.add(0x08).writePointer(uploadFunc2Addr);
-    uploadImagePayload.add(0x48).writePointer(imageIdAddr);
-    uploadImagePayload.add(0x68).writeUtf8String(receiver);
-    uploadImagePayload.add(0xa8).writePointer(md5Addr);
-    uploadImagePayload.add(0xe0).writePointer(ImagePathAddr1);
-    uploadImagePayload.add(0x110).writePointer(ImagePathAddr1);
-    uploadImagePayload.add(0x140).writePointer(ImagePathAddr1);
-    uploadImagePayload.add(0x1f8).writePointer(uploadAesKeyAddr);
+    uploadImageX1.writeByteArray(payload);
+    uploadImageX1.writePointer(uploadFunc1Addr);
+    uploadImageX1.add(0x08).writePointer(uploadFunc2Addr);
+    uploadImageX1.add(0x48).writePointer(imageIdAddr);
+    uploadImageX1.add(0x68).writeUtf8String(receiver);
+    uploadImageX1.add(0xa8).writePointer(md5Addr);
+    uploadImageX1.add(0xe0).writePointer(ImagePathAddr1);
+    uploadImageX1.add(0x110).writePointer(ImagePathAddr1);
+    uploadImageX1.add(0x140).writePointer(ImagePathAddr1);
+    uploadImageX1.add(0x1f8).writePointer(uploadAesKeyAddr);
 
     const startUploadMedia = new NativeFunction(uploadImageAddr, 'int64', ['pointer', 'pointer']);
 
-    console.log("开始手动触发 C2C 上传...");
-    const result = startUploadMedia(uploadGlobalX0, uploadImagePayload);
+    console.log(`开始手动触发 C2C 上传 X0 ${uploadGlobalX0}, X1: ${uploadImageX1}`);
+    const result = startUploadMedia(uploadGlobalX0, uploadImageX1);
     console.log("调用结果: " + result);
 }
 
 function attachUploadMedia() {
-    Interceptor.attach(uploadImageAddr, {
+    Interceptor.attach(uploadImageAddr.add(0x10), {
         onEnter: function (args) {
-            console.log("[+] enter UploadMedia");
             uploadGlobalX0 = this.context.x0;
-            const x1 = this.context.x1;
-            const selfId = x1.add(0x68).readUtf8String();
-            const imagePath = x1.add(0xe0).readPointer().readUtf8String();
+            uploadImageX1 = this.context.x1;
+            const selfId = uploadImageX1.add(0x68).readUtf8String();
+            const imagePath = uploadImageX1.add(0xe0).readPointer().readUtf8String();
             send({
                 type: "upload",
                 self_id: selfId,
             })
-            console.log("UploadMedia x1: " + uploadGlobalX0 + " imagePath: " + imagePath + " selfId: " + selfId);
+            console.log("UploadMedia x0: " + uploadGlobalX0 + " x1: " + uploadImageX1 + " imagePath: " + imagePath + " selfId: " + selfId);
         }
     })
 }
@@ -1010,7 +1008,7 @@ function patchCdnOnComplete() {
                 globalAesKey1 = x2.add(0x78).readPointer().readUtf8String();
                 globalMd5Key = x2.add(0x90).readPointer().readUtf8String();
                 const targetId = x2.add(0x40).readUtf8String();
-                console.log("CndOnUploadCompleteAddr X2"+ x2 +"[+] globalImageCdnKey: " + globalImageCdnKey + " globalAesKey1: " + globalAesKey1 +
+                console.log("X2" + x2 + "[+] globalImageCdnKey: " + globalImageCdnKey + " globalAesKey1: " + globalAesKey1 +
                     " globalMd5Key: " + globalMd5Key);
                 send({
                     type: "finish",
@@ -1032,6 +1030,39 @@ function patchCdnOnComplete() {
 
 setImmediate(patchCdnOnComplete)
 
+function attachGetCallbackFromWrapper() {
+    Interceptor.attach(uploadGetCallbackWrapperAddr, {
+        onEnter: function (args) {
+            const tmpFileId = this.context.x1.readPointer().readUtf8String();
+            const fileId = imageIdAddr.readUtf8String();
+            if (tmpFileId !== fileId) {
+                console.log("[+] GetCallbackFromWrapper tmpFileId: " + tmpFileId + " fileId: " + fileId);
+                return
+            }
+
+            console.log("[+] GetCallbackFromWrapper x8: " + this.context.x8);
+            uploadCallback.add(0x10).writePointer(uploadGetCallbackWrapperFuncAddr);
+            this.context.x8 = uploadCallback;
+        }
+    })
+
+    Interceptor.attach(uploadOnCompleteAddr, {
+        onEnter: function (args) {
+            const tmpFileId = this.context.x1.readPointer().readUtf8String();
+            const fileId = imageIdAddr.readUtf8String();
+            if (tmpFileId !== fileId) {
+                console.log("[+] OnComplete tmpFileId: " + tmpFileId + " fileId: " + fileId);
+                return
+            }
+
+            console.log("[+] OnComplete x8: " + this.context.x8);
+            uploadCallback.add(0x30).writePointer(uploadOnCompleteFuncAddr);
+            this.context.x8 = uploadCallback;
+        }
+    })
+}
+
+setImmediate(attachGetCallbackFromWrapper);
 
 rpc.exports = {
     triggerSendImgMessage: triggerSendImgMessage,

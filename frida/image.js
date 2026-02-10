@@ -189,6 +189,7 @@ var imageIdAddr = ptr(0)
 var md5Addr = ptr(0)
 var uploadAesKeyAddr = ptr(0)
 var ImagePathAddr1 = ptr(0)
+var uploadCallback = ptr(0)
 
 var globalImageCdnKey = "";
 var globalAesKey1 = "";
@@ -292,6 +293,7 @@ function setupSendImgMessageDynamic() {
     imgMessageAddr = Memory.alloc(256);
     uploadFunc1Addr = Memory.alloc(24);
     uploadFunc2Addr = Memory.alloc(24);
+    uploadCallback = Memory.alloc(128);
     imageIdAddr = Memory.alloc(256);
     md5Addr = Memory.alloc(256);
     uploadAesKeyAddr = Memory.alloc(256);
@@ -728,6 +730,40 @@ function patchCdnOnComplete() {
 }
 
 setImmediate(patchCdnOnComplete)
+
+function attachGetCallbackFromWrapper() {
+    Interceptor.attach(baseAddr.add(0x47A3828), {
+        onEnter: function (args) {
+            const tmpFileId = this.context.x1.readPointer().readUtf8String();
+            const fileId = imageIdAddr.readUtf8String();
+            if (tmpFileId !== fileId) {
+                console.log("[+] GetCallbackFromWrapper tmpFileId: " + tmpFileId + " fileId: " + fileId);
+                return
+            }
+
+            console.log("[+] GetCallbackFromWrapper x8: " + this.context.x8);
+            uploadCallback.add(0x10).writePointer(baseAddr.add(0x358D1A8));
+            this.context.x8 = uploadCallback;
+        }
+    })
+
+    Interceptor.attach(baseAddr.add(0x47A3E24), {
+        onEnter: function (args) {
+            const tmpFileId = this.context.x1.readPointer().readUtf8String();
+            const fileId = imageIdAddr.readUtf8String();
+            if (tmpFileId !== fileId) {
+                console.log("[+] OnComplete tmpFileId: " + tmpFileId + " fileId: " + fileId);
+                return
+            }
+
+            console.log("[+] OnComplete x8: " + this.context.x8);
+            uploadCallback.add(0x30).writePointer(baseAddr.add(0x358E398));
+            this.context.x8 = uploadCallback;
+        }
+    })
+}
+
+setImmediate(attachGetCallbackFromWrapper);
 
 
 rpc.exports = {

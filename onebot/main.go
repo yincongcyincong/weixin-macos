@@ -326,7 +326,7 @@ func SendWechatMsg(m *SendMsg) {
 	currTaskId := atomic.AddInt64(&taskId, 1)
 	log.Printf("📩 收到任务: %d\n", currTaskId)
 	
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 	
 	targetId := m.UserId

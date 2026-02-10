@@ -14,7 +14,9 @@
   "CndOnCompleteAddr": "0x358D98C",
   "sendImgMessageCallbackFunc": "0x865D680",
   "buf2RespAddr": "0x35F4B58",
-
-  "uploadFunc1": "0x802b8b0",
-  "uploadFunc2": "0x7fd5908"
+  "imgMessageCallbackFunc1": "0x865D680",
+  "uploadGetCallbackWrapperAddr": "0x47A3828",
+  "uploadGetCallbackWrapperFuncAddr": "0x358D1A8",
+  "uploadOnCompleteAddr": "0x47A3E24",
+  "uploadOnCompleteFuncAddr": "0x358E398"
 }
