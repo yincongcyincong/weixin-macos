@@ -1,0 +1,22 @@
+{
+  "protobufAddr": "",
+  "patchTextProtobufAddr": "",
+  "PatchTextProtobufDeleteAddr": "",
+  "sendMessageCallbackFunc": "",
+  "sendFuncAddr": "",
+  "req2bufEnterAddr": "",
+  "req2bufExitAddr": "",
+  "imgProtobufAddr": "",
+  "patchImgProtobufFunc1": "",
+  "patchImgProtobufFunc2": " ",
+  "imgProtobufDeleteAddr": "",
+  "uploadImageAddr": "",
+  "CndOnCompleteAddr": "",
+  "sendImgMessageCallbackFunc": "",
+  "buf2RespAddr": "",
+  "imgMessageCallbackFunc1": "",
+  "uploadGetCallbackWrapperAddr": "",
+  "uploadGetCallbackWrapperFuncAddr": "",
+  "uploadOnCompleteAddr": "",
+  "uploadOnCompleteFuncAddr": ""
+}

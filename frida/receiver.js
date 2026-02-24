@@ -48,14 +48,12 @@ function setReceiver() {
             var messages = [];
             var senderNickname = ""
 
-            let splitIndex = content.indexOf(':')
-            let pureContent = content.substring(splitIndex + 1).trim();
-
             if (sender.includes("@chatroom")) {
                 msgType = "group"
                 groupId = sender
 
-                senderUser = content.substring(0, splitIndex).trim();
+                let splitIndex = content.indexOf(':')
+                let pureContent = content.substring(splitIndex + 1).trim();
                 const parts = pureContent.split('\u2005');
                 for (let part of parts) {
                     part = part.trim();
@@ -91,7 +89,7 @@ function setReceiver() {
                 // 处理用户的名称
                 const splitIndex = userContent.indexOf(':')
                 senderNickname = userContent.substring(0, splitIndex).trim();
-                messages.push({type: "text", data: {text: pureContent}});
+                messages.push({type: "text", data: {text: content}});
             }
 
             const msgId = generateAESKey()
@@ -208,8 +206,7 @@ function getCleanString(uint8Array) {
                     out += String.fromCharCode(charCode);
                 }
             }
-        }
-        else if ((c & 0xF8) === 0xF0 && i + 2 < len) {
+        } else if ((c & 0xF8) === 0xF0 && i + 2 < len) {
             var c2 = uint8Array[i++];
             var c3 = uint8Array[i++];
             var c4 = uint8Array[i++];
