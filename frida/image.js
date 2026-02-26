@@ -173,7 +173,7 @@ var patchImgProtobufFunc1 = baseAddr.add(0x2455530)
 var patchImgProtobufFunc2 = baseAddr.add(0x2455550);
 var imgProtobufDeleteAddr = baseAddr.add(0x245558C);
 var CndOnCompleteAddr = baseAddr.add(0x36B03A0);
-var imgMessageCallbackFunc1 = baseAddr.add(0x8781AF8);
+var imgMessageCallbackFunc1 = baseAddr.add(0x8780AD8);
 
 var uploadImageX1;
 var imgCgiAddr = ptr(0);
@@ -741,26 +741,26 @@ function attachGetCallbackFromWrapper() {
                 return
             }
 
-            console.log("[+] GetCallbackFromWrapper x8: " + this.context.x8);
-            uploadCallback.add(0x10).writePointer(baseAddr.add(0x36AFFEC));
+            uploadCallback.add(0x10).writePointer(baseAddr.add(0x36AFBEC));
             this.context.x8 = uploadCallback;
+            console.log("[+] GetCallbackFromWrapper x8: " + this.context.x8);
         }
     })
 
-    // Interceptor.attach(baseAddr.add(0x47A3E24), {
-    //     onEnter: function (args) {
-    //         const tmpFileId = this.context.x1.readPointer().readUtf8String();
-    //         const fileId = imageIdAddr.readUtf8String();
-    //         if (tmpFileId !== fileId) {
-    //             console.log("[+] OnComplete tmpFileId: " + tmpFileId + " fileId: " + fileId);
-    //             return
-    //         }
-    //
-    //         console.log("[+] OnComplete x8: " + this.context.x8);
-    //         uploadCallback.add(0x30).writePointer(baseAddr.add(0x358E398));
-    //         this.context.x8 = uploadCallback;
-    //     }
-    // })
+    Interceptor.attach(baseAddr.add(0x4906EC8), {
+        onEnter: function (args) {
+            const tmpFileId = this.context.x1.readPointer().readUtf8String();
+            const fileId = imageIdAddr.readUtf8String();
+            if (tmpFileId !== fileId) {
+                console.log("[+] OnComplete tmpFileId: " + tmpFileId + " fileId: " + fileId);
+                return
+            }
+
+            console.log("[+] OnComplete x8: " + this.context.x8);
+            uploadCallback.add(0x30).writePointer(baseAddr.add(0x36B0DD0));
+            this.context.x8 = uploadCallback;
+        }
+    })
 }
 
 setImmediate(attachGetCallbackFromWrapper);

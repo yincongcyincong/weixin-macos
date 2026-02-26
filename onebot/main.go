@@ -102,7 +102,7 @@ func initFlag() {
 	flag.IntVar(&config.WechatPid, "wechat_pid", 0, "微信进程 ID: 58183, 仅当 type 为 local 时有效")
 	flag.StringVar(&config.OnebotToken, "token", "MuseBot", "OneBot Token: MuseBot")
 	flag.StringVar(&config.ImagePath, "image_path", "", "图片路径: /Users/xxx/Library/Containers/com.tencent.xinWeChat/Data/Documents/xwechat_files/xxx/temp/xxx/2026-01/Img/")
-	flag.StringVar(&config.WechatConf, "wechat_conf", "../wechat_version/4_1_7_31_mac.json", "微信配置文件路径: ../wechat_version/4_1_6_12_mac.json")
+	flag.StringVar(&config.WechatConf, "wechat_conf", "../wechat_version/4_1_7_55_mac.json", "微信配置文件路径: ../wechat_version/4_1_6_12_mac.json")
 	
 	flag.Parse()
 	
