@@ -6,6 +6,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"runtime/debug"
 	"strings"
 	"time"
 	
@@ -83,11 +84,11 @@ func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 func SendWebSocketMsg(msg map[string]interface{}) {
 	defer func() {
 		if r := recover(); r != nil {
-			log.Printf("panic: %v\n", r)
+			log.Printf("panic: %v, %v\n", r, string(debug.Stack()))
 		}
 	}()
 	
-	time.Sleep(time.Duration(config.SendInterval) * time.Second)
+	time.Sleep(time.Duration(config.SendInterval) * time.Millisecond)
 	// 这里处理你的 X1 数据
 	jsonData, err := json.Marshal(msg["payload"])
 	if err != nil {
@@ -96,21 +97,36 @@ func SendWebSocketMsg(msg map[string]interface{}) {
 	}
 	
 	fmt.Printf("发送数据: %s\n", string(jsonData))
-	if myWechatId == "" {
-		m := new(WechatMessage)
-		err = json.Unmarshal(jsonData, m)
-		if err != nil {
-			log.Printf("解析消息失败: %v\n", err)
-			return
-		}
-		myWechatId = m.SelfID
-		
-		if m.GroupId != "" {
-			userID2NicknameMap.Store(m.GroupId+"_"+m.UserID, m.Sender.Nickname)
+	m := new(WechatMessage)
+	err = json.Unmarshal(jsonData, m)
+	if err != nil {
+		log.Printf("解析消息失败: %v\n", err)
+		return
+	}
+	myWechatId = m.SelfID
+	if m.GroupId != "" {
+		userID2NicknameMap.Store(m.GroupId+"_"+m.UserID, m.Sender.Nickname)
+	}
+	
+	for _, msg := range m.Message {
+		if msg.Type == "record" {
+			path, err := SaveAudioFile(msg.Data.Media)
+			if err != nil {
+				log.Printf("保存音频失败: %v\n", err)
+				return
+			}
+			msg.Data.URL = path
+			msg.Data.Media = nil
 		}
 	}
 	
-	err = conn.WriteMessage(websocket.TextMessage, jsonData)
+	jsonReq, err := json.Marshal(m)
+	if err != nil {
+		log.Printf("JSON 序列化失败: %v\n", err)
+		return
+	}
+	
+	err = conn.WriteMessage(websocket.TextMessage, jsonReq)
 	if err != nil {
 		log.Printf("发送消息失败: %v\n", err)
 		return

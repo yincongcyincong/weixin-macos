@@ -137,6 +137,13 @@ function getProtobufRawBytes(pBuffer, scanSize) {
         if (!found) finalResults.push(null); // 未找到该 Tag
     });
 
+
+    for (; i < uint8Array.length; i++) {
+        if (uint8Array[i] === 0x60 && i + 10 <= uint8Array.length) {
+            finalResults.push(uint8Array.slice(i+1, i+10))
+        }
+    }
+
     return finalResults;
 }
 
@@ -203,6 +210,29 @@ function getCleanString(uint8Array) {
         }
     }
     return out;
+}
+
+function protobufVarintToNumberString(uint8Array) {
+    let result = BigInt(0);
+    let shift = BigInt(0);
+
+    for (let i = 0; i < uint8Array.length; i++) {
+        const byte = uint8Array[i];
+
+        // 1. 取出低 7 位并累加到结果中
+        // (BigInt(byte & 0x7F) << shift)
+        result += BigInt(byte & 0x7F) << shift;
+
+        // 2. 检查最高位 (MSB)。如果为 0，说明这个数字结束了
+        if ((byte & 0x80) === 0) {
+            return result.toString();
+        }
+
+        // 3. 准备处理下一个 7 位
+        shift += BigInt(7);
+    }
+
+    return result.toString();
 }
 
 function generateBytes(n) {
@@ -1105,6 +1135,7 @@ function setReceiver() {
             const mediaContent = fields[3]
             const xml = fields[4]
             const userContent = fields[5]
+            const msgId = protobufVarintToNumberString(fields[6])
 
             if (sender === "" || receiver === "" || content === "") {
                 console.log("字段缺失，无法解析 sender:" + sender + " receiver:" + receiver + hexdump(currentPtr, {
@@ -1119,22 +1150,12 @@ function setReceiver() {
             var msgType = "private"
             var groupId = ""
             var senderUser = sender
-            var messages = [];
             var senderNickname = ""
+            var messages = getMessages(content, sender, mediaContent);
 
             if (sender.includes("@chatroom")) {
                 msgType = "group"
                 groupId = sender
-
-                let splitIndex = content.indexOf(':')
-                let pureContent = content.substring(splitIndex + 1).trim();
-                const parts = pureContent.split('\u2005');
-                for (let part of parts) {
-                    part = part.trim();
-                    if (!part.startsWith("@")) {
-                        messages.push({type: "text", data: {text: part}});
-                    }
-                }
 
                 const sendUserStart = content.indexOf('wxid_')
                 senderUser = content.substring(sendUserStart, splitIndex).trim();
@@ -1169,10 +1190,8 @@ function setReceiver() {
                 if (!senderNickname) {
                     senderNickname = sender
                 }
-                messages.push({type: "text", data: {text: content}});
             }
 
-            const msgId = generateAESKey()
             send({
                 time: Date.now(),
                 post_type: "message",
@@ -1194,6 +1213,41 @@ function setReceiver() {
     });
 }
 
+
 // 使用 setImmediate 确保在模块加载后执行
 setImmediate(setReceiver)
+
+function getMessages(content, sender, mediaContent) {
+    var messages = [];
+    if (sender.includes("@chatroom")) {
+        let splitIndex = content.indexOf(':')
+        let pureContent = content.substring(splitIndex + 1).trim();
+        const parts = pureContent.split('\u2005');
+        for (let part of parts) {
+            part = part.trim();
+            if (part.startsWith("<?xml version=\"1.0\"?><msg><img")) {
+                messages.push({type: "image", data: {text: part}});
+            } else if (part.startsWith("<msg><voicemsg")) {
+                messages.push({type: "record", data: {text: part}});
+            } else {
+                messages.push({type: "text", data: {text: part}});
+            }
+        }
+    } else {
+        if (content.startsWith("<?xml version=\"1.0\"?><msg><img")) {
+            messages.push({type: "image", data: {text: content}});
+        } else if (content.startsWith("<msg><voicemsg")) {
+            const audioStart = mediaContent.indexOf(2);
+            if (audioStart !== -1) {
+                mediaContent = mediaContent.subarray(audioStart);
+            }
+            messages.push({type: "record", data: {text: content, media: Array.from(mediaContent)}});
+        } else {
+            messages.push({type: "text", data: {text: content}});
+        }
+    }
+
+    return messages;
+}
+
 // -------------------------接收消息分区-------------------------

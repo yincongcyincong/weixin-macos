@@ -9,9 +9,12 @@ import (
 	"io"
 	"math/rand"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
+	
+	"github.com/wdvxdr1123/go-silk"
 )
 
 func SaveBase64Image(base64Data string) (string, string, error) {
@@ -85,4 +88,62 @@ func DetectImageFormat(data []byte) string {
 	default:
 		return "unknown"
 	}
+}
+
+func EnsureDir(path string) error {
+	_, err := os.Stat(path)
+	if os.IsNotExist(err) {
+		return os.MkdirAll(path, 0755)
+	}
+	
+	return err
+}
+
+func SaveAudioFile(silkBytes []byte) (path string, err error) {
+	mp3Bytes, err := SilkToMp3(silkBytes)
+	if err != nil {
+		return "", err
+	}
+	
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	randomNumber := r.Intn(1000)
+	timestamp := time.Now().Unix()
+	fileName := fmt.Sprintf("%d_%d.mp3", randomNumber, timestamp)
+	targetPath := "./audio/" + fileName
+	err = os.WriteFile(targetPath, mp3Bytes, 0644)
+	if err != nil {
+		return "", err
+	}
+	
+	return targetPath, nil
+}
+
+func SilkToMp3(silkBytes []byte) ([]byte, error) {
+	var pcm, err = silk.DecodeSilkBuffToPcm(silkBytes, 16000)
+	if err != nil {
+		return nil, err
+	}
+	
+	cmd := exec.Command("ffmpeg",
+		"-f", "s16le",
+		"-ar", "16000",
+		"-ac", "1",
+		"-i", "pipe:0",
+		"-codec:a", "libmp3lame",
+		"-b:a", "192k",
+		"-f", "mp3",
+		"pipe:1",
+	)
+	cmd.Stdin = bytes.NewReader(pcm)
+	
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	
+	if err := cmd.Run(); err != nil {
+		return nil, fmt.Errorf("ffmpeg error: %v, details: %s", err, stderr.String())
+	}
+	
+	return out.Bytes(), nil
 }

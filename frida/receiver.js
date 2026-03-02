@@ -9,7 +9,8 @@ var buf2RespAddr = baseAddr.add(0x37173B0)
 function setReceiver() {
 
     // 3. 开始拦截
-    Interceptor.attach(buf2RespAddr, {
+    Interceptor.attach(buf2RespAddr,
+        {
         onEnter: function (args) {
             const currentPtr = this.context.x1;
             let start = 0x1e;
@@ -52,22 +53,12 @@ function setReceiver() {
             var msgType = "private"
             var groupId = ""
             var senderUser = sender
-            var messages = [];
             var senderNickname = ""
+            var messages = getMessages(content, sender, mediaContent);
 
             if (sender.includes("@chatroom")) {
                 msgType = "group"
                 groupId = sender
-
-                let splitIndex = content.indexOf(':')
-                let pureContent = content.substring(splitIndex + 1).trim();
-                const parts = pureContent.split('\u2005');
-                for (let part of parts) {
-                    part = part.trim();
-                    if (!part.startsWith("@")) {
-                        messages.push({type: "text", data: {text: part}});
-                    }
-                }
 
                 const sendUserStart = content.indexOf('wxid_')
                 senderUser = content.substring(sendUserStart, splitIndex).trim();
@@ -102,7 +93,6 @@ function setReceiver() {
                 if (!senderNickname) {
                     senderNickname = sender
                 }
-                messages.push({type: "text", data: {text: content}});
             }
 
             send({
@@ -119,7 +109,6 @@ function setReceiver() {
                 sender: {user_id: senderUser, nickname: senderNickname},
                 msgsource: xml,
                 raw_message: content,
-                // media: mediaContent,
                 show_content:userContent
             })
         },
@@ -129,6 +118,39 @@ function setReceiver() {
 
 // 使用 setImmediate 确保在模块加载后执行
 setImmediate(setReceiver)
+
+function getMessages(content, sender, mediaContent) {
+    var messages = [];
+    if (sender.includes("@chatroom")) {
+        let splitIndex = content.indexOf(':')
+        let pureContent = content.substring(splitIndex + 1).trim();
+        const parts = pureContent.split('\u2005');
+        for (let part of parts) {
+            part = part.trim();
+            if (part.startsWith("<?xml version=\"1.0\"?><msg><img")) {
+                messages.push({type: "image", data: {text: part}});
+            } else if (part.startsWith("<msg><voicemsg")) {
+                messages.push({type: "record", data: {text: part}});
+            } else {
+                messages.push({type: "text", data: {text: part}});
+            }
+        }
+    } else {
+        if (content.startsWith("<?xml version=\"1.0\"?><msg><img")) {
+            messages.push({type: "image", data: {text: content}});
+        } else if (content.startsWith("<msg><voicemsg")) {
+            const audioStart = mediaContent.indexOf(35);
+            if (audioStart !== -1) {
+                mediaContent = mediaContent.subarray(audioStart);
+            }
+           messages.push({type: "record", data: {text: content, media: mediaContent}});
+        } else {
+            messages.push({type: "text", data: {text: content}});
+        }
+    }
+
+    return messages;
+}
 
 
 function getProtobufRawBytes(pBuffer, scanSize) {

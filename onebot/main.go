@@ -33,10 +33,14 @@ var (
 )
 
 type WechatMessage struct {
-	GroupId string  `json:"group_id"`
-	SelfID  string  `json:"self_id"`
-	UserID  string  `json:"user_id"`
-	Sender  *Sender `json:"sender"`
+	GroupId   string     `json:"group_id"`
+	SelfID    string     `json:"self_id"`
+	UserID    string     `json:"user_id"`
+	Sender    *Sender    `json:"sender"`
+	Time      int64      `json:"time"`
+	PostType  string     `json:"post_type"`
+	MessageId string     `json:"message_id"`
+	Message   []*Message `json:"message"`
 }
 
 type Sender struct {
@@ -65,10 +69,12 @@ type Message struct {
 }
 
 type SendRequestData struct {
-	Id   string `json:"id"`
-	Text string `json:"text"`
-	File string `json:"file"`
-	QQ   string `json:"qq"`
+	Id    string `json:"id"`
+	Text  string `json:"text"`
+	File  string `json:"file"`
+	URL   string `json:"url"`
+	QQ    string `json:"qq"`
+	Media []byte `json:"media"`
 }
 
 type Config struct {
@@ -139,6 +145,7 @@ func initFlag() {
 	fmt.Println("ImagePath", config.ImagePath)
 	fmt.Println("WechatConf", config.WechatConf)
 	
+	EnsureDir("./audio")
 }
 
 func initFridaGadget() {
