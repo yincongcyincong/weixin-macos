@@ -12,9 +12,42 @@ function scanPatterns() {
 
         Memory.scan(baseAddr, module.size, pattern, {
             onMatch: function(address, size) {
-                // 计算相对偏移 (RVA)
                 const offset = address.sub(baseAddr);
-                console.log(`"${name}": "${offset}", 绝对地址: ${address}`);
+                switch (name) {
+                    case "cndOnCompleteAddr":
+                        console.log(`"${name}": "${offset.sub(0xCC)}", 绝对地址: ${address.sub(0xCC)}`);
+                        break;
+                    case "uploadGetCallbackWrapperAddr":
+                        console.log(`"${name}": "${offset}", 绝对地址: ${address}`);
+                        break;
+                    case "req2bufEnterAddr":
+                        console.log(`"${name}": "${offset}", 绝对地址: ${address}`);
+                        break;
+                    case "downloadFileAddr":
+                        console.log(`"${name}": "${offset.sub(0x3c)}", 绝对地址: ${address.sub(0x3c)}`);
+                        break;
+                    case "downloadImageAddr":
+                        console.log(`"${name}": "${offset.sub(0x18)}", 绝对地址: ${address.sub(0x18)}`);
+                        break;
+                    case "uploadImageAddr":
+                        console.log(`"${name}": "${offset.sub(0x30)}", 绝对地址: ${address.sub(0x30)}`);
+                        break;
+                    case "sendFuncAddr":
+                        console.log(`"${name}": "${offset.sub(0x44)}", 绝对地址: ${address.sub(0x44)}`);
+                        break;
+                    case "buf2RespAddr":
+                        console.log(`"${name}": "${offset.sub(0x10)}", 绝对地址: ${address.sub(0x10)}`);
+                        break;
+                    case "startDownloadMedia":
+                        console.log(`"${name}": "${offset.sub(0x28)}", 绝对地址: ${address.sub(0x28)}`);
+                        break;
+                    case "downloadVideoAddr":
+                        console.log(`"${name}": "${offset.sub(0x2c)}", 绝对地址: ${address.sub(0x2c)}`);
+                        break;
+                    case "startUploadMedia":
+                        console.log(`"${name}": "${offset.sub(0x30)}", 绝对地址: ${address.sub(0x30)}`);
+                        break;
+                }
             },
             onError: function(reason) {
                 console.error(`[-] 扫描 [${name}] 时出错: ${reason}`);
@@ -48,11 +81,11 @@ const myPatterns = [
     },
     {
         name: "uploadImageAddr",
-        pattern: "F8 5F 02 A9 F6 57 03 A9 F4 4F 04 A9 FD 7B 05 A9 FD 43 01 91 FF 43 0B D1 F3 03 01 AA F4 03 00 AA 68 E1 01 F0 08 71 44 F9 08 01 40 F9 A8 83 1A F8"
+        pattern: "08 01 40 F9 A8 83 1A F8  28 9C 40 B9 1F 0D 00 71",
     },
     {
         name: "sendFuncAddr",
-        pattern: "FF 03 05 D1 FC 6F 11 A9 F4 4F 12 A9 FD 7B 13 A9 FD C3 04 91 F3 03 01 AA F4 03 00 AA A8 EB 01 D0 08 71 44 F9 08 01 40 F9 A8 83 1D F8"
+        pattern: "E0 03 00 91 21 00 80 52 E5 03 03 AA 26 85 80 52 07 00 80 D2"
     },
     {
         name: "buf2RespAddr",

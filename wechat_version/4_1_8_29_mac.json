@@ -1,0 +1,22 @@
+{
+    "textCallbackFuncAddr": "0x2527C80",
+    "sendMessageCallbackFunc": "0x8919F48",
+    "sendFuncAddr": "0x4992040",
+    "req2bufEnterAddr": "0x380b950",
+    "req2bufExitAddr": "0x380CA64",
+    "imageCallbackFuncAddr": "0x251E880",
+    "imgMessageCallbackFunc": "0x8919A10",
+    "uploadImageAddr": "0x4ad95c0",
+    "cndOnCompleteAddr": "0x37c8f00",
+    "buf2RespAddr": "0x3830fc8",
+    "uploadGetCallbackWrapperAddr": "0x4aa7084",
+    "uploadGetCallbackWrapperFuncAddr": "0x37C874C",
+    "uploadOnCompleteAddr": "0x4AA7680",
+    "uploadOnCompleteFuncAddr": "0x37C9930",
+    "downloadImagAddr": "0x4bfd350",
+    "startDownloadMedia": "0x4ada234",
+    "downloadFileAddr": "0x4b9c0d8",
+    "downloadVideoAddr": "0x4bbde5c",
+    "videoCallbackFuncAddr": "0x258BB10",
+    "videoMessageCallbackFunc": "0x891C7B0"
+}

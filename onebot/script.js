@@ -724,7 +724,6 @@ setImmediate(attachReq2buf);
 
 // 初始化进行内存的分配
 function setupSendImgMessageDynamic() {
-    console.log("[+] Starting setupSendImgMessageDynamic Dynamic Message Patching...");
 
     // 1. 动态分配内存块（按需分配大小）
     // 分配原则：字符串给 64-128 字节，结构体按实际大小分配

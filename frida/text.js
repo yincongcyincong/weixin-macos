@@ -78,8 +78,8 @@ function patchString(addr, plainStr) {
 // -------------------------全局变量分区-------------------------
 
 // 文本消息全局变量
-var textCallbackFuncAddr = baseAddr.add(0x2524140);
-var protobufAddr = textCallbackFuncAddr.add(0x44);
+var textCallbackFuncAddr = baseAddr.add(0x2527C80);
+var protobufAddr = textCallbackFuncAddr.add(0x40);
 var patchTextProtobufAddr = textCallbackFuncAddr.add(0x20);
 var patchTextProtobufByte
 var patchTextProtobufDeleteAddr = textCallbackFuncAddr.add(0x5C);
@@ -90,15 +90,15 @@ var sendTextMessageAddr = ptr(0);
 var textMessageAddr = ptr(0);
 var textProtoX1PayloadAddr = ptr(0);
 
-var sendMessageCallbackFunc = baseAddr.add(0x8915F28);
+var sendMessageCallbackFunc = baseAddr.add(0x8919F48);
 
 
 // 双方公共使用的地址
 var triggerX1Payload;
 var triggerX0;
-var req2bufEnterAddr = baseAddr.add(0x3806b30);
-var req2bufExitAddr = baseAddr.add(0x3807C44);
-var sendFuncAddr = baseAddr.add(0x498D2E0);
+var req2bufEnterAddr = baseAddr.add(0x380b950);
+var req2bufExitAddr = baseAddr.add(0x380CA64);
+var sendFuncAddr = baseAddr.add(0x4992040);
 var insertMsgAddr = ptr(0);
 var sendMsgType = "";
 
@@ -124,6 +124,7 @@ function setupSendTextMessageDynamic() {
     textCgiAddr = Memory.alloc(128);
     sendTextMessageAddr = Memory.alloc(256);
     textMessageAddr = Memory.alloc(256);
+    triggerX1Payload = Memory.alloc(1024)
 
     // A. 写入字符串内容
     patchString(textCgiAddr, "/cgi-bin/micromsg-bin/newsendmsg");
@@ -305,13 +306,12 @@ function triggerSendTextMessage(taskId, receiver, content, atUser) {
 function AttachSendTextProto() {
     Interceptor.attach(sendFuncAddr.add(0x10), {
         onEnter: function (args) {
-            if (triggerX1Payload) {
+            if (triggerX0) {
                 return
             }
 
             triggerX0 = this.context.x0;
-            triggerX1Payload = this.context.x1;
-            console.log(`[+] 捕获到 MMStartTask 调用，X0地址：${triggerX0}, Payload 地址: ${triggerX1Payload}`);
+            console.log(`[+] 捕获到 MMStartTask 调用，X0地址：${triggerX0}`);
         }
     })
 }
